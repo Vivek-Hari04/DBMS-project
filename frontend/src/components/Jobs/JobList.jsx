@@ -3,7 +3,7 @@ import { jobAPI, applicationAPI } from '../../services/api';
 import './Jobs.css';
 import { useAuth } from '../../context/AuthContext';
 
-function JobList({ workerId }) {
+function JobList() {
   const { user } = useAuth();
   const [jobs, setJobs] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -46,7 +46,7 @@ function JobList({ workerId }) {
   };
 
   const submitApplication = async () => {
-    if (!workerId) {
+    if (!user || user.user_type !== 'worker') {
       setApplicationMessage('Please login as a worker to apply');
       return;
     }
