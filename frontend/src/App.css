@@ -1,7 +1,7 @@
 .App {
   min-height: 100vh;
-  color: black;
-  background-color: white;
+  color: gray;
+  background-color: black;
 }
 
 header {
@@ -50,6 +50,7 @@ header h1 {
   background-color: #f8f9fa;
   flex-wrap: wrap;
   justify-content: center;
+  color: black;
 }
 
 .nav-buttons button {
@@ -58,6 +59,7 @@ header h1 {
   background-color: white;
   border: 1px solid #ddd;
   border-radius: 4px;
+  color: black;
 }
 
 .nav-buttons button:hover {

@@ -7,12 +7,14 @@ import CreateJob from './components/Jobs/CreateJob';
 import JobList from './components/Jobs/JobList';
 import MyApplications from './components/Jobs/MyApplications';
 import JobApplications from './components/Jobs/JobApplications';
+import MyJobs from './components/Jobs/MyJobs.jsx';
 import './App.css';
 
 function App() {
   const { user, logout, isAuthenticated, isEmployer, isWorker, loading } = useAuth();
   const [showLogin, setShowLogin] = useState(true);
   const [view, setView] = useState('home');
+  //const [selectedJobId, setSelectedJobId] = useState(null);
 
   if (loading) {
     return <div>Loading...</div>;
@@ -71,7 +73,7 @@ function App() {
             {view === 'createJob' && isEmployer && <CreateJob />}
             {view === 'browseJobs' && <JobList />}
             {view === 'myApplications' && isWorker && <MyApplications workerId={user.id} />}
-            {view === 'myJobs' && isEmployer && <div>My Jobs (Coming soon)</div>}
+            {view === 'myJobs' && isEmployer && <MyJobs />}
           </main>
         </>
       )}

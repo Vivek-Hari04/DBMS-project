@@ -371,3 +371,108 @@
   margin: 20px auto;
   padding: 20px;
 }
+
+/* My Jobs */
+.my-jobs-container {
+  max-width: 1200px;
+  margin: 20px auto;
+  padding: 20px;
+}
+
+.my-jobs-detail {
+  max-width: 1200px;
+  margin: 20px auto;
+  padding: 20px;
+}
+
+.back-btn {
+  background-color: #6c757d;
+  color: white;
+  padding: 10px 20px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.back-btn:hover {
+  background-color: #5a6268;
+}
+
+.my-job-card {
+  border-left: 4px solid #007bff;
+}
+
+.job-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 10px;
+}
+
+.status-pill {
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: bold;
+  text-transform: uppercase;
+}
+
+.status-pill.open {
+  background-color: #28a745;
+  color: white;
+}
+
+.status-pill.closed {
+  background-color: #dc3545;
+  color: white;
+}
+
+.status-pill.filled {
+  background-color: #6c757d;
+  color: white;
+}
+
+.job-meta {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: #666;
+  margin: 10px 0;
+}
+
+.posted-date {
+  margin: 0;
+}
+
+.view-applications-btn {
+  width: 100%;
+  padding: 10px;
+  background-color: #007bff;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: bold;
+}
+
+.view-applications-btn:hover {
+  background-color: #0056b3;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 60px 20px;
+  background-color: #f8f9fa;
+  border-radius: 8px;
+  margin-top: 20px;
+}
+
+.empty-state p {
+  font-size: 16px;
+  color: #666;
+  margin: 10px 0;
+}
