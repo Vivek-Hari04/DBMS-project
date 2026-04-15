@@ -69,8 +69,12 @@ export const AuthProvider = ({ children }) => {
     register,
     logout,
     isAuthenticated: !!token,
-    isEmployer: user?.user_type === 'employer',
-    isWorker: user?.user_type === 'worker',
+    isHandyman:    user?.user_type === 'handyman',
+    isCustomer:    user?.user_type === 'customer',
+    isShopkeeper:  user?.user_type === 'shopkeeper',
+    // Legacy aliases kept for backward-compat with App.jsx nav guards
+    isWorker:      user?.user_type === 'handyman',
+    isEmployer:    user?.user_type === 'shopkeeper',
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
