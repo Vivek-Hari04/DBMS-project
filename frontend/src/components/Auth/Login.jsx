@@ -92,6 +92,9 @@ function Login() {
             )}
           </button>
         </form>
+        <div className="auth-redirect">
+          <p>Don't have an account? <a href="/register">Sign Up</a></p>
+        </div>
       </div>
     </div>
   );
