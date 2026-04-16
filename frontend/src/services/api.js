@@ -40,11 +40,13 @@ api.interceptors.response.use(
 export const authAPI = {
   register: (userData) => api.post('/register', userData),
   login: (credentials) => api.post('/login', credentials),
+  recoverAccount: (credentials) => api.post('/recover-account', credentials),
 };
 
 export const profileAPI = {
   getProfile: (userId) => api.get(`/profile/${userId}`),
   updateProfile: (userId, data) => api.put(`/profile/${userId}`, data),
+  deleteAccount: (userId, data) => api.post(`/profile/${userId}/delete`, data),
 };
 
 export const jobAPI = {

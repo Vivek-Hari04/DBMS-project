@@ -4,9 +4,12 @@ import { profileAPI } from '../services/api';
 import './ProfilePage.css';
 
 function ProfilePage() {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const [profile, setProfile] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deletePassword, setDeletePassword] = useState('');
+  
   const [formData, setFormData] = useState({
     full_name: '',
     phone: '',
@@ -65,6 +68,20 @@ function ProfilePage() {
     }
   };
 
+  const handleDeleteAccount = async (e) => {
+    e.preventDefault();
+    try {
+      setLoading(true);
+      await profileAPI.deleteAccount(user.id, { password: deletePassword });
+      alert("Account scheduled for deletion.");
+      logout();
+    } catch (err) {
+      setError(err.response?.data?.error || 'Failed to delete account.');
+      setLoading(false);
+      setShowDeleteModal(false);
+    }
+  };
+
   if (loading) {
     return <div className="loading-state">Loading profile...</div>;
   }
@@ -99,7 +116,9 @@ function ProfilePage() {
               </div>
               <div className="profile-field">
                 <span className="field-label">Role</span>
-                <span className="field-value capitalize">{profile?.user_type}</span>
+                <span className="field-value capitalize">
+                  {profile?.user_type === 'customer' ? 'employer' : profile?.user_type}
+                </span>
               </div>
               <div className="profile-field">
                 <span className="field-label">Phone</span>
@@ -189,6 +208,43 @@ function ProfilePage() {
           </form>
         )}
       </div>
+
+      <div className="danger-zone card mt-4" style={{ borderColor: '#f87171' }}>
+        <h3 className="text-red-500 font-semibold mb-2">Danger Zone</h3>
+        <p className="text-gray-600 mb-4 text-sm">
+          Once you delete your account, you will lose access immediately. Your account and data will be permanently deleted after 30 days. You can recover your account anytime within the 30-day window by trying to log in.
+        </p>
+        <button className="btn" style={{ backgroundColor: '#fee2e2', color: '#dc2626' }} onClick={() => setShowDeleteModal(true)}>
+          Delete Account
+        </button>
+      </div>
+
+      {showDeleteModal && (
+        <div className="modal-overlay" onClick={() => setShowDeleteModal(false)}>
+          <div className="modal-content card" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '400px' }}>
+            <h3 className="card-title text-red-500">Delete Account</h3>
+            <p className="text-sm text-gray-600 mb-4">
+              Your account will be suspended and permanently deleted in 30 days. Please enter your password to confirm.
+            </p>
+            <form onSubmit={handleDeleteAccount}>
+              <div className="form-group mb-4">
+                <label className="form-label">Password</label>
+                <input 
+                  type="password" 
+                  value={deletePassword}
+                  onChange={(e) => setDeletePassword(e.target.value)}
+                  className="form-input w-full"
+                  required
+                />
+              </div>
+              <div className="form-actions flex justify-end gap-2">
+                <button type="button" className="btn btn-secondary" onClick={() => setShowDeleteModal(false)}>Cancel</button>
+                <button type="submit" className="btn" style={{ background: '#dc2626', color: 'white' }}>Confirm Delete</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

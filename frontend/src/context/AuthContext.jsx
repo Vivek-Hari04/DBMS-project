@@ -37,7 +37,28 @@ export const AuthProvider = ({ children }) => {
     } catch (error) {
       return { 
         success: false, 
-        error: error.response?.data?.error || 'Login failed' 
+        error: error.response?.data?.error || 'Login failed',
+        is_deleted: error.response?.data?.is_deleted || false
+      };
+    }
+  };
+
+  const recover = async (email, password) => {
+    try {
+      const response = await authAPI.recoverAccount({ email, password });
+      const { token, user } = response.data;
+      
+      setToken(token);
+      setUser(user);
+      
+      localStorage.setItem('token', token);
+      localStorage.setItem('user', JSON.stringify(user));
+      
+      return { success: true };
+    } catch (error) {
+      return { 
+        success: false, 
+        error: error.response?.data?.error || 'Recovery failed' 
       };
     }
   };
@@ -66,6 +87,7 @@ export const AuthProvider = ({ children }) => {
     token,
     loading,
     login,
+    recover,
     register,
     logout,
     isAuthenticated: !!token,

@@ -5,9 +5,11 @@ import './Login.css';
 function Login() {
   const [formData, setFormData] = useState({ email: '', password: '' });
   const [apiError, setApiError] = useState('');
+  const [apiSuccess, setApiSuccess] = useState('');
   const [loading, setLoading] = useState(false);
+  const [isDeleted, setIsDeleted] = useState(false);
 
-  const { login } = useAuth();
+  const { login, recover } = useAuth();
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -17,6 +19,7 @@ function Login() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setApiError('');
+    setIsDeleted(false);
     setLoading(true);
 
     const result = await login(formData.email, formData.password);
@@ -24,6 +27,24 @@ function Login() {
 
     if (!result.success) {
       setApiError(result.error || 'Login failed. Please try again.');
+      if (result.is_deleted) {
+        setIsDeleted(true);
+      }
+    }
+  };
+
+  const handleRecover = async () => {
+    setApiError('');
+    setApiSuccess('');
+    setLoading(true);
+
+    const result = await recover(formData.email, formData.password);
+    setLoading(false);
+
+    if (result.success) {
+       setApiSuccess('Account recovered successfully!');
+    } else {
+       setApiError(result.error || 'Recovery failed.');
     }
   };
 
@@ -42,6 +63,13 @@ function Login() {
           <div className="alert alert-error" role="alert">
             <span className="alert-icon">✕</span>
             {apiError}
+          </div>
+        )}
+        
+        {apiSuccess && (
+          <div className="alert alert-success" role="status">
+            <span className="alert-icon">✓</span>
+            {apiSuccess}
           </div>
         )}
 
@@ -82,15 +110,19 @@ function Login() {
             />
           </div>
 
-          <button type="submit" className="submit-btn" disabled={loading}>
-            {loading ? (
-              <span className="btn-loading">
-                <span className="spinner" /> Signing in…
-              </span>
-            ) : (
-              'Sign In'
-            )}
-          </button>
+          {isDeleted ? (
+            <button type="button" onClick={handleRecover} className="submit-btn" disabled={loading} style={{ background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)' }}>
+              {loading ? (
+                <span className="btn-loading"><span className="spinner" /> Recovering…</span>
+              ) : 'Recover Account'}
+            </button>
+          ) : (
+            <button type="submit" className="submit-btn" disabled={loading}>
+              {loading ? (
+                <span className="btn-loading"><span className="spinner" /> Signing in…</span>
+              ) : 'Sign In'}
+            </button>
+          )}
         </form>
         <div className="auth-redirect">
           <p>Don't have an account? <a href="/register">Sign Up</a></p>

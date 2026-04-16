@@ -40,7 +40,7 @@ function Register() {
 
     // user_type must be one of the three exact values — no exceptions
     if (!VALID_USER_TYPES.includes(data.user_type))
-      errs.user_type = 'Please select a valid role: handyman, customer, or shopkeeper.';
+      errs.user_type = 'Please select a valid role: handyman, employer, or shopkeeper.';
 
     return errs;
   };
@@ -192,9 +192,9 @@ function Register() {
                 <option value="" disabled>
                   — Select your role —
                 </option>
-                <option value="handyman">Handyman</option>
-                <option value="customer">Customer</option>
-                <option value="shopkeeper">Shopkeeper</option>
+                <option value="handyman">Employee</option>
+                <option value="customer">Employer</option>
+                {/* <option value="shopkeeper">Shopkeeper</option> */}
               </select>
               <span className="select-chevron">▾</span>
             </div>

@@ -69,7 +69,9 @@ function DashboardLayout() {
               <div className="avatar">{user.full_name.charAt(0).toUpperCase()}</div>
               <div className="user-info">
                 <span className="user-name">{user.full_name}</span>
-                <span className="user-role">{user.user_type}</span>
+                <span className="user-role">
+                  {user.user_type === 'customer' ? 'employer' : user.user_type}
+                </span>
               </div>
             </div>
             <button onClick={logout} className="btn-logout">
