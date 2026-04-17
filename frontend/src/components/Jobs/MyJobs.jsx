@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { jobAPI } from '../../services/api';
+import { jobAPI, applicationAPI, ratingAPI } from '../../services/api';
+import toast from 'react-hot-toast';
 import JobApplications from './JobApplications';
 import './Jobs.css';
 import './TableUtilities.css';
@@ -11,6 +12,8 @@ function MyJobs() {
   
   // State to manage which job's applications are being viewed
   const [selectedJobId, setSelectedJobId] = useState(null);
+  
+  const [ratingModal, setRatingModal] = useState({ show: false, jobId: null, revieweeId: null, rating: 5, review: '' });
 
   useEffect(() => {
     fetchMyJobs();
@@ -40,6 +43,32 @@ function MyJobs() {
       setError('Failed to load your jobs');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDeleteJob = async (jobId) => {
+    if (!window.confirm('Are you sure you want to delete this job?')) return;
+    try {
+      await jobAPI.deleteJob(jobId);
+      setJobs(jobs.filter(j => j.id !== jobId));
+      toast.success('Job deleted successfully');
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed to delete job');
+    }
+  };
+
+  const submitRating = async () => {
+    try {
+      await ratingAPI.createRating({
+        job_id: ratingModal.jobId,
+        reviewee_id: ratingModal.revieweeId,
+        rating: ratingModal.rating,
+        review: ratingModal.review
+      });
+      toast.success('Rating submitted!');
+      setRatingModal({ show: false, jobId: null, revieweeId: null, rating: 5, review: '' });
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed to submit rating');
     }
   };
 
@@ -86,14 +115,38 @@ function MyJobs() {
                   </td>
                   <td className="text-gray-500">{job.location}</td>
                   <td className="text-gray-500">
-                    {new Date(job.expires_at).toLocaleDateString()}
+                    <span className={`badge ${job.status === 'open' ? 'badge-primary' : 'badge-success'}`}>
+                      {job.status}
+                    </span>
                   </td>
                   <td>
+                    {job.status === 'open' && (
+                      <button 
+                        onClick={() => setSelectedJobId(job.id)} 
+                        className="btn btn-secondary text-sm mr-2"
+                      >
+                        View Applications
+                      </button>
+                    )}
+                    {job.status === 'closed' && (
+                      <button 
+                        onClick={() => {
+                          // we would ideally need hired_worker_id from job to rate them
+                          // Since we didn't inject hired_worker_id into GetJob response yet, we can fetch it or inject it 
+                          // A small workaround if we don't have it -> redirect to applications which show hired worker
+                          setSelectedJobId(job.id)
+                        }} 
+                        className="btn btn-primary text-sm mr-2"
+                      >
+                        Hired Worker
+                      </button>
+                    )}
                     <button 
-                      onClick={() => setSelectedJobId(job.id)} 
-                      className="btn btn-secondary text-sm"
+                      onClick={() => handleDeleteJob(job.id)}
+                      className="btn btn-danger text-sm"
+                      style={{ background: '#ef4444', color: 'white', border: 'none', padding: '0.4rem 0.8rem', borderRadius: '4px', cursor: 'pointer' }}
                     >
-                      View Applications
+                      Delete
                     </button>
                   </td>
                 </tr>

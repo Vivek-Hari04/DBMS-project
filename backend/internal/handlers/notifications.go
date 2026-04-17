@@ -106,3 +106,18 @@ func (h *NotificationHandler) DeleteNotification(c *gin.Context) {
     }
     c.JSON(http.StatusOK, gin.H{"message": "Deleted"})
 }
+
+func (h *NotificationHandler) ClearAllNotifications(c *gin.Context) {
+    userID, exists := c.Get("user_id")
+    if !exists {
+        c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+        return
+    }
+    
+    _, err := h.DB.Exec(context.Background(), "DELETE FROM notifications WHERE user_id = $1", userID.(int))
+    if err != nil {
+        c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to clear all notifications"})
+        return
+    }
+    c.JSON(http.StatusOK, gin.H{"message": "All sorted"})
+}

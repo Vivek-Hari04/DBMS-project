@@ -53,6 +53,13 @@ export const jobAPI = {
   createJob: (jobData) => api.post('/jobs', jobData),
   getAllJobs: () => api.get('/jobs'),
   getJob: (jobId) => api.get(`/jobs/${jobId}`),
+  deleteJob: (jobId) => api.delete(`/jobs/${jobId}`),
+  hireWorker: (jobId, workerId) => api.put(`/jobs/${jobId}/hire/${workerId}`),
+};
+
+export const ratingAPI = {
+  createRating: (ratingData) => api.post('/ratings', ratingData),
+  getUserRatings: (userId) => api.get(`/ratings/user/${userId}`),
 };
 
 export const applicationAPI = {
@@ -67,6 +74,7 @@ export const notificationAPI = {
   getNotifications: () => api.get('/notifications'),
   markAsRead: (id) => api.put(`/notifications/${id}/read`),
   markAllAsRead: () => api.put('/notifications/read-all'),
+  clearAllNotifications: () => api.delete('/notifications/clear-all'),
   deleteNotification: (id) => api.delete(`/notifications/${id}`)
 };
 

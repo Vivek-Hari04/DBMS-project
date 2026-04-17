@@ -48,6 +48,7 @@ func main() {
     jobHandler := &handlers.JobHandler{DB: database}
     applicationHandler := &handlers.ApplicationHandler{DB: database}
     notificationHandler := &handlers.NotificationHandler{DB: database}
+    ratingHandler := &handlers.RatingHandler{DB: database}
 
     // Create Gin router
     router := gin.Default()
@@ -84,6 +85,8 @@ func main() {
 
         // Job routes (employers only)
         protected.POST("/jobs", middleware.EmployerOnly(), jobHandler.CreateJob)
+        protected.DELETE("/jobs/:id", middleware.EmployerOnly(), jobHandler.DeleteJob)
+        protected.PUT("/jobs/:id/hire/:workerId", middleware.EmployerOnly(), jobHandler.HireWorker)
 
         // Application routes (workers only)
         protected.POST("/applications", middleware.WorkerOnly(), applicationHandler.ApplyToJob)
@@ -97,7 +100,12 @@ func main() {
         protected.GET("/notifications", notificationHandler.GetUserNotifications)
         protected.PUT("/notifications/:id/read", notificationHandler.MarkAsRead)
         protected.PUT("/notifications/read-all", notificationHandler.MarkAllAsRead)
+        protected.DELETE("/notifications/clear-all", notificationHandler.ClearAllNotifications)
         protected.DELETE("/notifications/:id", notificationHandler.DeleteNotification)
+
+        // Rating routes
+        protected.POST("/ratings", ratingHandler.CreateRating)
+        protected.GET("/ratings/user/:id", ratingHandler.GetUserRatings)
     }
 
     // Get port from environment or default to 8080

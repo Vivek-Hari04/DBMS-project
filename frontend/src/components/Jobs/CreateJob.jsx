@@ -16,7 +16,7 @@ function CreateJob() {
     category_id: 1, // Defaulting for now
     contact_phone: '',
     contact_email: '',
-    expires_in_days: 30, // Default to 30 days
+    expiry_days: 7, // Default to 7 days (backend allows max 7)
   });
 
   const [loading, setLoading] = useState(false);
@@ -27,7 +27,7 @@ function CreateJob() {
     const { name, value } = e.target;
     setFormData((prev) => ({
       ...prev,
-      [name]: ['salary_min', 'salary_max', 'category_id', 'expires_in_days'].includes(name) 
+      [name]: ['salary_min', 'salary_max', 'category_id', 'expiry_days'].includes(name) 
         ? (value ? Number(value) : '') 
         : value,
     }));

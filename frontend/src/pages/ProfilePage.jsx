@@ -118,7 +118,7 @@ function ProfilePage() {
               <div className="profile-field">
                 <span className="field-label">Role</span>
                 <span className="field-value capitalize">
-                  {profile?.user_type === 'customer' ? 'employer' : profile?.user_type}
+                  {profile?.user_type === 'customer' ? 'employer' : (profile?.user_type === 'handyman' ? 'worker' : profile?.user_type)}
                 </span>
               </div>
               <div className="profile-field">

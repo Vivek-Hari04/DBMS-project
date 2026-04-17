@@ -1,0 +1,1 @@
+{"message":"Login successful","token":"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoxMiwiZW1haWwiOiJ3b3JrZXJAdGVzdC5jb20iLCJ1c2VyX3R5cGUiOiJoYW5keW1hbiIsImV4cCI6MTc3NjQ4NjE0OSwiaWF0IjoxNzc2Mzk5NzQ5fQ.a1qyicMlWeiRJKuzmEap3s1GruEG1_z-piR3MhYnDJU","user":{"email":"worker@test.com","full_name":"Test Worker","id":12,"user_type":"handyman"}}

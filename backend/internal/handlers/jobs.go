@@ -7,7 +7,7 @@ import (
     "time"
     "github.com/gin-gonic/gin"
     "github.com/jackc/pgx/v5/pgxpool"
-		//"strconv"
+    "strconv"
 )
 
 type JobHandler struct {
@@ -65,7 +65,7 @@ if err != nil {
     return
 }
 
-if userType != "employer" {
+if userType != "customer" && userType != "shopkeeper" {
     c.JSON(http.StatusForbidden, gin.H{"error": "Only employers can post jobs"})
     return
 }
@@ -143,8 +143,6 @@ func (h *JobHandler) GetJobs(c *gin.Context) {
         JOIN users u ON j.employer_id = u.id
         LEFT JOIN categories c ON j.category_id = c.id
         WHERE j.is_active = true 
-          AND j.status = 'open'
-          AND j.expires_at > NOW()
         ORDER BY j.created_at DESC
     `
 
@@ -303,4 +301,99 @@ func (h *JobHandler) GetJob(c *gin.Context) {
     }
 
     c.JSON(http.StatusOK, job)
+}
+
+// DeleteJob endpoint
+func (h *JobHandler) DeleteJob(c *gin.Context) {
+    jobIDStr := c.Param("id")
+    jobID, err := strconv.Atoi(jobIDStr)
+    if err != nil {
+        c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid job ID"})
+        return
+    }
+
+    employerID, _ := c.Get("user_id")
+
+    // Use empID safely
+    var empID int
+    switch v := employerID.(type) {
+    case float64: empID = int(v)
+    case int: empID = v
+    }
+
+    query := `DELETE FROM jobs WHERE id = $1 AND employer_id = $2`
+    
+    cmdTag, err := h.DB.Exec(context.Background(), query, jobID, empID)
+    if err != nil {
+        c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete job", "db_error": err.Error()})
+        return
+    }
+
+    if cmdTag.RowsAffected() == 0 {
+        c.JSON(http.StatusNotFound, gin.H{"error": "Job not found or not authorized"})
+        return
+    }
+
+    c.JSON(http.StatusOK, gin.H{"message": "Job deleted successfully"})
+}
+
+// HireWorker endpoint
+func (h *JobHandler) HireWorker(c *gin.Context) {
+    jobIDStr := c.Param("id")
+    workerIDStr := c.Param("workerId")
+    jobID, err := strconv.Atoi(jobIDStr)
+    if err != nil {
+        c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid job ID"})
+        return
+    }
+    workerID, err := strconv.Atoi(workerIDStr)
+    if err != nil {
+        c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid worker ID"})
+        return
+    }
+
+    employerID, _ := c.Get("user_id")
+
+    var empID int
+    switch v := employerID.(type) {
+    case float64: empID = int(v)
+    case int: empID = v
+    }
+
+    var status string
+    err = h.DB.QueryRow(context.Background(), `SELECT status FROM jobs WHERE id = $1 AND employer_id = $2`, jobID, empID).Scan(&status)
+    if err != nil {
+        c.JSON(http.StatusNotFound, gin.H{"error": "Job not found or not authorized"})
+        return
+    }
+    if status != "open" {
+        c.JSON(http.StatusBadRequest, gin.H{"error": "Job is already closed or in progress"})
+        return
+    }
+
+    tx, err := h.DB.Begin(context.Background())
+    if err != nil {
+        c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to start tx"})
+        return
+    }
+    defer tx.Rollback(context.Background())
+
+    _, err = tx.Exec(context.Background(), `UPDATE jobs SET status = 'closed', hired_worker_id = $1 WHERE id = $2`, workerID, jobID)
+    if err != nil { c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update job"}); return }
+
+    _, err = tx.Exec(context.Background(), `UPDATE applications SET status = 'selected' WHERE job_id = $1 AND worker_id = $2`, jobID, workerID)
+    if err != nil { c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update selected application"}); return }
+    
+    _, err = tx.Exec(context.Background(), `UPDATE applications SET status = 'rejected' WHERE job_id = $1 AND worker_id != $2`, jobID, workerID)
+    if err != nil { c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to reject remaining applications"}); return }
+
+    // notify the worker
+    _, _ = tx.Exec(context.Background(), `INSERT INTO notifications (user_id, type, title, message) VALUES ($1, 'status_updated', 'You were Hired!', 'Congratulations! You have been hired for a job.')`, workerID)
+
+    if err = tx.Commit(context.Background()); err != nil {
+        c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to commit tx"})
+        return
+    }
+
+    c.JSON(http.StatusOK, gin.H{"message": "Worker hired successfully"})
 }

@@ -17,10 +17,21 @@ function JobList() {
   
   // Filters
   const [searchTerm, setSearchTerm] = useState('');
+  const [workerApps, setWorkerApps] = useState([]);
 
   useEffect(() => {
     fetchJobs();
-  }, []);
+    if (isHandyman && user) {
+      fetchWorkerApps();
+    }
+  }, [isHandyman, user]);
+
+  const fetchWorkerApps = async () => {
+    try {
+      const res = await applicationAPI.getWorkerApplications(user.id);
+      setWorkerApps(res.data.applications || []);
+    } catch (err) {}
+  };
 
   const fetchJobs = async () => {
     try {
@@ -48,7 +59,7 @@ function JobList() {
 
   const submitApplication = async () => {
     if (!isHandyman) {
-      setApplicationMessage({ type: 'error', text: 'Please login as a handyman to apply.' });
+      setApplicationMessage({ type: 'error', text: 'Please login as a worker to apply.' });
       return;
     }
 
@@ -118,9 +129,15 @@ function JobList() {
               
               <div className="job-footer">
                 <span className="job-expires">Expires: {new Date(job.expires_at).toLocaleDateString()}</span>
-                <button onClick={() => viewJobDetails(job)} className="btn btn-primary">
-                  View Details
-                </button>
+                {workerApps.find(app => app.job_id === job.id) ? (
+                  <button disabled className="btn btn-secondary" style={{opacity:0.6, cursor:'not-allowed'}}>
+                    Already Applied
+                  </button>
+                ) : (
+                  <button onClick={() => viewJobDetails(job)} className="btn btn-primary">
+                    View Details
+                  </button>
+                )}
               </div>
             </div>
           ))}
@@ -210,7 +227,7 @@ function JobList() {
                   </div>
                 </div>
               ) : (
-                <div className="read-only-msg">Login as a Handyman to apply.</div>
+                <div className="read-only-msg">Login as a Worker to apply.</div>
               )}
             </div>
           </div>

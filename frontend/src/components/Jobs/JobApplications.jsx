@@ -33,6 +33,16 @@ function JobApplications({ jobId, onBack }) {
     }
   };
 
+  const handleHireWorker = async (workerId) => {
+    try {
+      await jobAPI.hireWorker(jobId, workerId);
+      toast.success('Worker hired successfully!');
+      fetchJobAndApplications(); // Refresh everything
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed to hire worker');
+    }
+  };
+
   const handleStatusUpdate = async (applicationId, newStatus) => {
     try {
       await applicationAPI.updateApplicationStatus(applicationId, newStatus);
@@ -40,6 +50,7 @@ function JobApplications({ jobId, onBack }) {
       setApplications(applications.map(app => 
         app.id === applicationId ? { ...app, status: newStatus } : app
       ));
+      toast.success('Application updated successfully');
     } catch (err) {
       toast.error(err.response?.data?.error || 'Failed to update status');
     }
@@ -47,7 +58,7 @@ function JobApplications({ jobId, onBack }) {
 
   const getStatusBadge = (status) => {
     switch (status) {
-      case 'accepted': return <span className="badge badge-success">Accepted</span>;
+      case 'selected': return <span className="badge badge-success">Hired</span>;
       case 'rejected': return <span className="badge badge-error">Rejected</span>;
       default: return <span className="badge badge-warning">Pending</span>;
     }
@@ -98,13 +109,13 @@ function JobApplications({ jobId, onBack }) {
                   </td>
                   <td>{getStatusBadge(app.status)}</td>
                   <td>
-                    {app.status === 'pending' && (
+                    {app.status === 'pending' && job?.status === 'open' && (
                       <div className="flex gap-2">
                         <button 
-                          onClick={() => handleStatusUpdate(app.id, 'accepted')}
+                          onClick={() => handleHireWorker(app.worker_id)}
                           className="btn btn-primary text-sm p-2 mr-2"
                         >
-                          Accept
+                          Hire Worker
                         </button>
                         <button 
                           onClick={() => handleStatusUpdate(app.id, 'rejected')}

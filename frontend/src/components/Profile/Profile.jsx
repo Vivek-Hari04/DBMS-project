@@ -72,7 +72,7 @@ function Profile({ userId }) {
             <strong>Email:</strong> {profile.email}
           </div>
           <div className="profile-field">
-            <strong>User Type:</strong> {profile.user_type}
+            <strong>User Type:</strong> {profile.user_type === 'customer' ? 'employer' : (profile.user_type === 'handyman' ? 'worker' : profile.user_type)}
           </div>
           <div className="profile-field">
             <strong>Phone:</strong> {profile.phone || 'Not provided'}

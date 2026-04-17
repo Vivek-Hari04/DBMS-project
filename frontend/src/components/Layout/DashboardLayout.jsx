@@ -52,12 +52,23 @@ function DashboardLayout() {
 
   const handleMarkAllAsRead = async () => {
     try {
-      await notificationAPI.markAllAsRead();
-      setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
-      toast.success('All marked as read');
+      if (unreadCount > 0) {
+        await notificationAPI.markAllAsRead();
+        setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
+      }
+    } catch (err) {
+      console.error('Failed to mark all read', err);
+    }
+  };
+
+  const handleClearAll = async () => {
+    try {
+      await notificationAPI.clearAllNotifications();
+      setNotifications([]);
+      toast.success('All sorted');
       setShowDropdown(false);
     } catch (err) {
-      toast.error('Failed to mark all read');
+      toast.error('Failed to clear notifications');
     }
   };
 
@@ -127,7 +138,13 @@ function DashboardLayout() {
             <div className="notifications-wrapper" ref={dropdownRef}>
               <button 
                 className="notification-bell-btn"
-                onClick={() => setShowDropdown(!showDropdown)}
+                onClick={() => {
+                  const nextShow = !showDropdown;
+                  setShowDropdown(nextShow);
+                  if (nextShow && unreadCount > 0) {
+                    handleMarkAllAsRead();
+                  }
+                }}
               >
                 <Bell size={24} />
                 {unreadCount > 0 && (
@@ -141,12 +158,12 @@ function DashboardLayout() {
                 <div className="notifications-dropdown">
                   <div className="notifications-header">
                     <h3>Notifications</h3>
-                    {unreadCount > 0 && (
+                    {notifications.length > 0 && (
                       <button 
-                        onClick={handleMarkAllAsRead}
+                        onClick={handleClearAll}
                         className="mark-all-read"
                       >
-                        Mark all read
+                        Clear all
                       </button>
                     )}
                   </div>
@@ -195,7 +212,7 @@ function DashboardLayout() {
               <div className="user-info">
                 <span className="user-name">{user.full_name}</span>
                 <span className="user-role">
-                  {user.user_type === 'customer' ? 'employer' : user.user_type}
+                  {user.user_type === 'customer' ? 'employer' : (user.user_type === 'handyman' ? 'worker' : user.user_type)}
                 </span>
               </div>
             </div>
