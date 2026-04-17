@@ -18,7 +18,7 @@ type RegisterRequest struct {
     Email    string `json:"email" binding:"required,email"`
     Password string `json:"password" binding:"required,min=6"`
     FullName string `json:"full_name" binding:"required"`
-    UserType string `json:"user_type" binding:"required,oneof=worker employer"`
+    UserType string `json:"user_type" binding:"required,oneof=handyman customer shopkeeper"`
     Phone    string `json:"phone"`
     Location string `json:"location"`
 }
@@ -92,7 +92,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 
     // Get user from database
     query := `
-        SELECT id, email, password_hash, full_name, user_type 
+        SELECT id, email, password_hash, full_name, user_type, deleted_at 
         FROM users 
         WHERE email = $1
     `
@@ -103,10 +103,11 @@ func (h *AuthHandler) Login(c *gin.Context) {
         PasswordHash string
         FullName     string
         UserType     string
+        DeletedAt    *time.Time
     }
 
     err := h.DB.QueryRow(context.Background(), query, req.Email).Scan(
-        &user.ID, &user.Email, &user.PasswordHash, &user.FullName, &user.UserType,
+        &user.ID, &user.Email, &user.PasswordHash, &user.FullName, &user.UserType, &user.DeletedAt,
     )
 
     if err != nil {
@@ -121,6 +122,20 @@ func (h *AuthHandler) Login(c *gin.Context) {
         return
     }
 
+    // Check if account is scheduled for deletion
+    if user.DeletedAt != nil {
+        if time.Since(*user.DeletedAt) < 30*24*time.Hour {
+            c.JSON(http.StatusForbidden, gin.H{
+                "error": "Account scheduled for deletion. You can recover within 30 days.",
+                "is_deleted": true,
+            })
+            return
+        } else {
+            c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid email or password"})
+            return
+        }
+    }
+
 		// Generate JWT token
     token, err := auth.GenerateToken(user.ID, user.Email, user.UserType)
     if err != nil {
@@ -128,7 +143,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
         return
     }
 
-    // Success! Return user data (we'll add JWT token later)
+    // Success! Return user data
     c.JSON(http.StatusOK, gin.H{
         "message": "Login successful",
 				"token":   token,
@@ -140,3 +155,73 @@ func (h *AuthHandler) Login(c *gin.Context) {
         },
     })
 }
+
+func (h *AuthHandler) RecoverAccount(c *gin.Context) {
+    var req LoginRequest
+    if err := c.ShouldBindJSON(&req); err != nil {
+        c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+        return
+    }
+
+    query := `SELECT id, email, password_hash, full_name, user_type, deleted_at FROM users WHERE email = $1`
+    
+    var user struct {
+        ID           int
+        Email        string
+        PasswordHash string
+        FullName     string
+        UserType     string
+        DeletedAt    *time.Time
+    }
+
+    err := h.DB.QueryRow(context.Background(), query, req.Email).Scan(
+        &user.ID, &user.Email, &user.PasswordHash, &user.FullName, &user.UserType, &user.DeletedAt,
+    )
+
+    if err != nil {
+        c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid email or password"})
+        return
+    }
+
+    err = bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(req.Password))
+    if err != nil {
+        c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid email or password"})
+        return
+    }
+
+    if user.DeletedAt == nil {
+        c.JSON(http.StatusBadRequest, gin.H{"error": "Account is not deleted"})
+        return
+    }
+
+    if time.Since(*user.DeletedAt) > 30*24*time.Hour {
+        c.JSON(http.StatusBadRequest, gin.H{"error": "Account recovery period has expired"})
+        return
+    }
+
+    // Recover account
+    _, err = h.DB.Exec(context.Background(), `UPDATE users SET deleted_at = NULL WHERE id = $1`, user.ID)
+    if err != nil {
+        c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to recover account"})
+        return
+    }
+
+    // Generate JWT token
+    token, err := auth.GenerateToken(user.ID, user.Email, user.UserType)
+    if err != nil {
+        c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate token"})
+        return
+    }
+
+    c.JSON(http.StatusOK, gin.H{
+        "message": "Account recovered successfully",
+        "token":   token,
+        "user": gin.H{
+            "id":        user.ID,
+            "email":     user.Email,
+            "full_name": user.FullName,
+            "user_type": user.UserType,
+        },
+    })
+}
+

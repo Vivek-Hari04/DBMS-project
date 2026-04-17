@@ -12,5 +12,6 @@ type User struct {
     Location     string    `json:"location" db:"location"`
     Bio          string    `json:"bio" db:"bio"`
     AvatarURL    string    `json:"avatar_url" db:"avatar_url"`
-    CreatedAt    time.Time `json:"created_at" db:"created_at"`
+    CreatedAt    time.Time  `json:"created_at" db:"created_at"`
+    DeletedAt    *time.Time `json:"deleted_at" db:"deleted_at"`
 }

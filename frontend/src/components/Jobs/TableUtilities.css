@@ -1,0 +1,42 @@
+/* ── Table Styles for Applications / Dashboards ────────────────────────── */
+.table-container {
+  overflow-x: auto;
+}
+
+.table-container table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.table-container th {
+  padding: 16px;
+  background-color: #f9fafb;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #6b7280;
+  text-transform: uppercase;
+  text-align: left;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.table-container td {
+  padding: 16px;
+  border-bottom: 1px solid #f3f4f6;
+  color: #374151;
+  font-size: 0.95rem;
+}
+
+.table-container tr:last-child td {
+  border-bottom: none;
+}
+
+.table-container tr:hover td {
+  background-color: #f9fafb;
+}
+
+.font-medium { font-weight: 500; }
+.text-gray-900 { color: #111827; }
+.text-gray-600 { color: #4b5563; }
+.text-gray-500 { color: #6b7280; }
+.mb-4 { margin-bottom: 16px; }
+.p-0 { padding: 0 !important; }

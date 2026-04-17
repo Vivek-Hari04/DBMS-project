@@ -1,15 +1,18 @@
 package main
 
 import (
+    "context"
     "log"
     "os"
+    "time"
 
     "github.com/gin-gonic/gin"
     "github.com/gin-contrib/cors"
     "github.com/joho/godotenv"
+    "github.com/jackc/pgx/v5/pgxpool" // Needed for cleanup
     "github.com/Sabari-Vijayan/DBMS-project/internal/db"
     "github.com/Sabari-Vijayan/DBMS-project/internal/handlers"
-    "github.com/Sabari-Vijayan/DBMS-project/internal/middleware"  // Add this
+    "github.com/Sabari-Vijayan/DBMS-project/internal/middleware"
 )
 
 func main() {
@@ -24,6 +27,20 @@ func main() {
         log.Fatal("Failed to connect to database:", err)
     }
     defer database.Close()
+
+    // Start background cleanup task
+    go func(db *pgxpool.Pool) {
+        ticker := time.NewTicker(24 * time.Hour)
+        for {
+            <-ticker.C
+            _, err := db.Exec(context.Background(), `DELETE FROM users WHERE deleted_at < NOW() - INTERVAL '30 days'`)
+            if err != nil {
+                log.Println("Error running cleanup task:", err)
+            } else {
+                log.Println("Successfully ran daily cleanup task for deleted accounts")
+            }
+        }
+    }(database)
 
     // Create handlers
     authHandler := &handlers.AuthHandler{DB: database}
@@ -51,6 +68,7 @@ func main() {
     // Public routes (no authentication required)
     router.POST("/api/register", authHandler.Register)
     router.POST("/api/login", authHandler.Login)
+    router.POST("/api/recover-account", authHandler.RecoverAccount) // Add this
     router.GET("/api/jobs", jobHandler.GetJobs)              // Anyone can view jobs
     router.GET("/api/jobs/:id", jobHandler.GetJob)           // Anyone can view job details
 
@@ -61,6 +79,7 @@ func main() {
         // Profile routes
         protected.GET("/profile/:id", profileHandler.GetProfile)
         protected.PUT("/profile/:id", profileHandler.UpdateProfile)
+        protected.POST("/profile/:id/delete", profileHandler.DeleteAccount) // Add this
 
         // Job routes (employers only)
         protected.POST("/jobs", middleware.EmployerOnly(), jobHandler.CreateJob)

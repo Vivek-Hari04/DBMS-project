@@ -1,112 +1,123 @@
 import { useState, useEffect } from 'react';
-import { applicationAPI } from '../../services/api';
+import { applicationAPI, jobAPI } from '../../services/api';
 import './Jobs.css';
+import './TableUtilities.css';
 
-function JobApplications({ jobId, jobTitle }) {
+function JobApplications({ jobId, onBack }) {
   const [applications, setApplications] = useState([]);
+  const [job, setJob] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [message, setMessage] = useState('');
 
   useEffect(() => {
     if (jobId) {
-      fetchApplications();
+      fetchJobAndApplications();
     }
   }, [jobId]);
 
-  const fetchApplications = async () => {
+  const fetchJobAndApplications = async () => {
     try {
-      const response = await applicationAPI.getJobApplications(jobId);
-      setApplications(response.data.applications || []);
-      setLoading(false);
+      setLoading(true);
+      // Fetch job details to show title
+      const jobRes = await jobAPI.getJob(jobId);
+      setJob(jobRes.data.job);
+      
+      // Fetch applications
+      const appsRes = await applicationAPI.getJobApplications(jobId);
+      setApplications(appsRes.data.applications || []);
     } catch (err) {
       setError('Failed to load applications');
+    } finally {
       setLoading(false);
     }
   };
 
-  const handleStatusUpdate = async (applicationId, status) => {
+  const handleStatusUpdate = async (applicationId, newStatus) => {
     try {
-      await applicationAPI.updateApplicationStatus(applicationId, status);
-      setMessage(`Application ${status} successfully!`);
-      // Refresh applications
-      fetchApplications();
-      setTimeout(() => setMessage(''), 3000);
+      await applicationAPI.updateApplicationStatus(applicationId, newStatus);
+      // Update local state
+      setApplications(applications.map(app => 
+        app.id === applicationId ? { ...app, status: newStatus } : app
+      ));
     } catch (err) {
-      setMessage('Failed to update application status');
+      alert(err.response?.data?.error || 'Failed to update status');
     }
   };
 
   const getStatusBadge = (status) => {
-    const statusColors = {
-      pending: 'badge-pending',
-      accepted: 'badge-accepted',
-      rejected: 'badge-rejected',
-    };
-    return statusColors[status] || 'badge-pending';
+    switch (status) {
+      case 'accepted': return <span className="badge badge-success">Accepted</span>;
+      case 'rejected': return <span className="badge badge-error">Rejected</span>;
+      default: return <span className="badge badge-warning">Pending</span>;
+    }
   };
 
-  if (loading) return <div>Loading applications...</div>;
-  if (error) return <div className="error">{error}</div>;
+  if (loading) return <div className="loading-state">Loading applications...</div>;
 
   return (
-    <div className="job-applications-container">
-      <h2>Applications for: {jobTitle}</h2>
-      <p>Total Applications: {applications.length}</p>
+    <div className="job-applications-view">
+      <div className="section-header">
+        <div>
+          <button onClick={onBack} className="btn-link mb-4">← Back to My Jobs</button>
+          <h2 className="section-title">Applications for {job?.title}</h2>
+        </div>
+      </div>
 
-      {message && <div className="success">{message}</div>}
+      {error && <div className="alert alert-error mb-4">{error}</div>}
 
       {applications.length === 0 ? (
-        <p>No applications received yet.</p>
+        <div className="empty-state card">
+          <p>No applications received yet for this job.</p>
+        </div>
       ) : (
-        <div className="applications-list">
-          {applications.map((app) => (
-            <div key={app.id} className="application-card employer-view">
-              <div className="application-header">
-                <div>
-                  <h3>{app.worker_name}</h3>
-                  <p className="worker-contact">
-                    📧 {app.worker_email}
-                    {app.worker_phone && ` | 📞 ${app.worker_phone}`}
-                  </p>
-                  {app.worker_location && (
-                    <p>📍 {app.worker_location}</p>
-                  )}
-                </div>
-                <span className={`status-badge ${getStatusBadge(app.status)}`}>
-                  {app.status.toUpperCase()}
-                </span>
-              </div>
-
-              {app.cover_letter && (
-                <div className="cover-letter-full">
-                  <strong>Cover Letter:</strong>
-                  <p>{app.cover_letter}</p>
-                </div>
-              )}
-
-              <p className="applied-date">
-                Applied on: {new Date(app.applied_at).toLocaleString()}
-              </p>
-
-              {app.status === 'pending' && (
-                <div className="action-buttons">
-                  <button
-                    onClick={() => handleStatusUpdate(app.id, 'accepted')}
-                    className="accept-btn"
-                  >
-                    Accept
-                  </button>
-                  <button
-                    onClick={() => handleStatusUpdate(app.id, 'rejected')}
-                    className="reject-btn"
-                  >
-                    Reject
-                  </button>
-                </div>
-              )}
-            </div>
-          ))}
+        <div className="table-container card p-0">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr>
+                <th>Applicant Name</th>
+                <th>Cover Letter</th>
+                <th>Applied On</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {applications.map((app) => (
+                <tr key={app.id}>
+                  <td className="font-medium text-gray-900">{app.worker_name}</td>
+                  <td className="text-gray-600">
+                    {app.cover_letter ? (
+                      <div className="text-sm">{app.cover_letter}</div>
+                    ) : (
+                      <span className="italic text-gray-400">No cover letter</span>
+                    )}
+                  </td>
+                  <td className="text-gray-500">
+                    {new Date(app.created_at).toLocaleDateString()}
+                  </td>
+                  <td>{getStatusBadge(app.status)}</td>
+                  <td>
+                    {app.status === 'pending' && (
+                      <div className="flex gap-2">
+                        <button 
+                          onClick={() => handleStatusUpdate(app.id, 'accepted')}
+                          className="btn btn-primary text-sm p-2 mr-2"
+                        >
+                          Accept
+                        </button>
+                        <button 
+                          onClick={() => handleStatusUpdate(app.id, 'rejected')}
+                          className="btn btn-secondary text-sm p-2"
+                        >
+                          Reject
+                        </button>
+                      </div>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
     </div>
