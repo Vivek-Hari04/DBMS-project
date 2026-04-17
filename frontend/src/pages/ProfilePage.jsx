@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { profileAPI } from '../services/api';
+import toast from 'react-hot-toast';
 import './ProfilePage.css';
 
 function ProfilePage() {
@@ -73,7 +74,7 @@ function ProfilePage() {
     try {
       setLoading(true);
       await profileAPI.deleteAccount(user.id, { password: deletePassword });
-      alert("Account scheduled for deletion.");
+      toast.success("Account scheduled for deletion.");
       logout();
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to delete account.');

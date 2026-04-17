@@ -184,6 +184,13 @@ func (h *ApplicationHandler) ApplyToJob(c *gin.Context) {
         return
     }
 
+    var employerID int
+    h.DB.QueryRow(context.Background(), `SELECT employer_id FROM jobs WHERE id = $1`, req.JobID).Scan(&employerID)
+    h.DB.Exec(context.Background(), `
+        INSERT INTO notifications (user_id, type, title, message) 
+        VALUES ($1, 'application_received', 'New Application', 'Someone applied to your job.')
+    `, employerID)
+
     c.JSON(http.StatusCreated, gin.H{
         "message": "Application submitted successfully",
         "application": application,
@@ -368,6 +375,15 @@ func (h *ApplicationHandler) UpdateApplicationStatus(c *gin.Context) {
         c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update application"})
         return
     }
+
+    var workerID int
+    var jobTitle string
+    h.DB.QueryRow(context.Background(), `SELECT a.worker_id, j.title FROM applications a JOIN jobs j ON a.job_id = j.id WHERE a.id = $1`, applicationID).Scan(&workerID, &jobTitle)
+    
+    h.DB.Exec(context.Background(), `
+        INSERT INTO notifications (user_id, type, title, message) 
+        VALUES ($1, 'status_updated', 'Application Update', 'Your application for "' || $2 || '" has been ' || $3)
+    `, workerID, jobTitle, req.Status)
 
     c.JSON(http.StatusOK, gin.H{
         "message": "Application status updated",

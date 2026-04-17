@@ -1,5 +1,6 @@
 import { useAuth } from './context/AuthContext';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { Toaster } from 'react-hot-toast';
 
 // Pages & Layouts
 import DashboardLayout from './components/Layout/DashboardLayout';
@@ -29,8 +30,10 @@ function App() {
   }
 
   return (
-    <Router>
-      <Routes>
+    <>
+      <Toaster position="top-right" />
+      <Router>
+        <Routes>
         {/* Public Auth Routes */}
         <Route 
           path="/login" 
@@ -61,6 +64,7 @@ function App() {
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Router>
+    </>
   );
 }
 

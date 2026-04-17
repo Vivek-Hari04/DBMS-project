@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { applicationAPI, jobAPI } from '../../services/api';
+import toast from 'react-hot-toast';
 import './Jobs.css';
 import './TableUtilities.css';
 
@@ -40,7 +41,7 @@ function JobApplications({ jobId, onBack }) {
         app.id === applicationId ? { ...app, status: newStatus } : app
       ));
     } catch (err) {
-      alert(err.response?.data?.error || 'Failed to update status');
+      toast.error(err.response?.data?.error || 'Failed to update status');
     }
   };
 

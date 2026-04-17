@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { profileAPI } from '../../services/api';
+import toast from 'react-hot-toast';
 import './Profile.css';
 
 function Profile({ userId }) {
@@ -48,7 +49,7 @@ function Profile({ userId }) {
       const response = await profileAPI.updateProfile(userId, formData);
       setProfile(response.data.profile);
       setIsEditing(false);
-      alert('Profile updated successfully!');
+      toast.success('Profile updated successfully!');
     } catch (err) {
       setError('Failed to update profile');
     }

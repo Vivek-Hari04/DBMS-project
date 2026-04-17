@@ -118,6 +118,12 @@ if userType != "employer" {
         c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create job", "details": err.Error()})
         return
     }
+    h.DB.Exec(context.Background(), `
+        INSERT INTO notifications (user_id, type, title, message)
+        SELECT id, 'job_created', 'New Job Posted', 'A new job "' || $1 || '" has been posted in ' || $2
+        FROM users 
+        WHERE user_type IN ('worker', 'handyman')
+    `, req.Title, req.Location)
 
     c.JSON(http.StatusCreated, gin.H{
         "message": "Job created successfully",

@@ -12,8 +12,10 @@
   "dependencies": {
     "@heroicons/react": "^2.2.0",
     "axios": "^1.12.2",
+    "lucide-react": "^1.8.0",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
+    "react-hot-toast": "^2.6.0",
     "react-router-dom": "^7.9.3"
   },
   "devDependencies": {

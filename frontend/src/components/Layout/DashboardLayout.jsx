@@ -1,10 +1,67 @@
+import { useState, useEffect, useRef } from 'react';
 import { Navigate, Outlet, Link, useLocation } from 'react-router-dom';
+import { Bell } from 'lucide-react';
+import toast from 'react-hot-toast';
+import { notificationAPI } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 import './DashboardLayout.css';
 
 function DashboardLayout() {
   const { user, isAuthenticated, logout, isHandyman, isCustomer, isShopkeeper } = useAuth();
   const location = useLocation();
+  const [notifications, setNotifications] = useState([]);
+  const [showDropdown, setShowDropdown] = useState(false);
+  const dropdownRef = useRef(null);
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      loadNotifications();
+      const interval = setInterval(loadNotifications, 30000); // 30s polling
+      return () => clearInterval(interval);
+    }
+  }, [isAuthenticated]);
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+        setShowDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const loadNotifications = async () => {
+    try {
+      const res = await notificationAPI.getNotifications();
+      setNotifications(res.data.notifications || []);
+    } catch (error) {
+      console.error('Failed to load notifications', error);
+    }
+  };
+
+  const handleMarkAsRead = async (id, isRead) => {
+    if (isRead) return;
+    try {
+      await notificationAPI.markAsRead(id);
+      setNotifications(prev => prev.map(n => n.id === id ? { ...n, is_read: true } : n));
+    } catch (err) {
+      toast.error('Failed to mark read');
+    }
+  };
+
+  const handleMarkAllAsRead = async () => {
+    try {
+      await notificationAPI.markAllAsRead();
+      setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
+      toast.success('All marked as read');
+      setShowDropdown(false);
+    } catch (err) {
+      toast.error('Failed to mark all read');
+    }
+  };
+
+  const unreadCount = notifications.filter(n => !n.is_read).length;
 
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
@@ -65,6 +122,74 @@ function DashboardLayout() {
             </h1>
           </div>
           <div className="topbar-right">
+            
+            {/* Notifications Dropdown */}
+            <div className="notifications-wrapper" ref={dropdownRef}>
+              <button 
+                className="notification-bell-btn"
+                onClick={() => setShowDropdown(!showDropdown)}
+              >
+                <Bell size={24} />
+                {unreadCount > 0 && (
+                  <span className="notification-badge">
+                    {unreadCount > 9 ? '9+' : unreadCount}
+                  </span>
+                )}
+              </button>
+
+              {showDropdown && (
+                <div className="notifications-dropdown">
+                  <div className="notifications-header">
+                    <h3>Notifications</h3>
+                    {unreadCount > 0 && (
+                      <button 
+                        onClick={handleMarkAllAsRead}
+                        className="mark-all-read"
+                      >
+                        Mark all read
+                      </button>
+                    )}
+                  </div>
+                  
+                  <div className="notifications-body">
+                    {notifications.length === 0 ? (
+                      <div className="notification-empty">
+                        <Bell size={32} opacity={0.5} />
+                        No notifications yet
+                      </div>
+                    ) : (
+                      <div className="notifications-list">
+                        {notifications.map(notification => (
+                          <div 
+                            key={notification.id} 
+                            onClick={() => handleMarkAsRead(notification.id, notification.is_read)}
+                            className={`notification-item ${!notification.is_read ? 'unread' : ''}`}
+                          >
+                            <div className="notif-title-row">
+                              <h4 className="notif-title">
+                                {notification.title}
+                              </h4>
+                              {!notification.is_read && (
+                                <span className="unread-dot"></span>
+                              )}
+                            </div>
+                            <p className="notif-message">
+                              {notification.message}
+                            </p>
+                            <div className="notif-time">
+                              {new Date(notification.created_at).toLocaleString(undefined, { 
+                                month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' 
+                              })}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+
             <div className="user-profile">
               <div className="avatar">{user.full_name.charAt(0).toUpperCase()}</div>
               <div className="user-info">
