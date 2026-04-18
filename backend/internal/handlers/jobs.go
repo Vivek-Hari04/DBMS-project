@@ -137,8 +137,10 @@ func (h *JobHandler) GetJobs(c *gin.Context) {
         SELECT j.id, j.employer_id, j.title, j.description, j.category_id, j.location,
                j.salary_min, j.salary_max, j.duration, j.requirements,
                j.contact_phone, j.contact_email, j.expires_at, j.status, j.is_active, j.created_at,
+               j.hired_worker_id,
                u.full_name as employer_name,
-               c.name as category_name
+               c.name as category_name,
+               COALESCE((SELECT AVG(rating) FROM ratings WHERE reviewee_id = j.employer_id), 0) as average_rating
         FROM jobs j
         JOIN users u ON j.employer_id = u.id
         LEFT JOIN categories c ON j.category_id = c.id
@@ -164,13 +166,16 @@ func (h *JobHandler) GetJobs(c *gin.Context) {
             duration, requirements, contactPhone, contactEmail, categoryName sql.NullString
             expiresAt, createdAt time.Time
             isActive bool
+            hiredWorkerID sql.NullInt64
+            averageRating float64
         )
 
         err := rows.Scan(
             &id, &employerID, &title, &description, &categoryID, &location,
             &salaryMin, &salaryMax, &duration, &requirements,
             &contactPhone, &contactEmail, &expiresAt, &status, &isActive, &createdAt,
-            &employerName, &categoryName,
+            &hiredWorkerID,
+            &employerName, &categoryName, &averageRating,
         )
 
         if err != nil {
@@ -188,8 +193,12 @@ func (h *JobHandler) GetJobs(c *gin.Context) {
             "is_active":     isActive,
             "expires_at":    expiresAt,
             "created_at":    createdAt,
+            "average_rating": averageRating,
         }
 
+        if hiredWorkerID.Valid {
+            job["hired_worker_id"] = hiredWorkerID.Int64
+        }
         if categoryID.Valid {
             job["category_id"] = categoryID.Int64
         }
@@ -232,8 +241,10 @@ func (h *JobHandler) GetJob(c *gin.Context) {
         SELECT j.id, j.employer_id, j.title, j.description, j.category_id, j.location,
                j.salary_min, j.salary_max, j.duration, j.requirements,
                j.contact_phone, j.contact_email, j.expires_at, j.status, j.is_active, j.created_at,
+               j.hired_worker_id,
                u.full_name as employer_name,
-               c.name as category_name
+               c.name as category_name,
+               COALESCE((SELECT AVG(rating) FROM ratings WHERE reviewee_id = j.employer_id), 0) as average_rating
         FROM jobs j
         JOIN users u ON j.employer_id = u.id
         LEFT JOIN categories c ON j.category_id = c.id
@@ -248,13 +259,16 @@ func (h *JobHandler) GetJob(c *gin.Context) {
         duration, requirements, contactPhone, contactEmail, categoryName sql.NullString
         expiresAt, createdAt time.Time
         isActive bool
+        hiredWorkerID sql.NullInt64
+        averageRating float64
     )
 
     err := h.DB.QueryRow(context.Background(), query, jobID).Scan(
         &id, &employerID, &title, &description, &categoryID, &location,
         &salaryMin, &salaryMax, &duration, &requirements,
         &contactPhone, &contactEmail, &expiresAt, &status, &isActive, &createdAt,
-        &employerName, &categoryName,
+        &hiredWorkerID,
+        &employerName, &categoryName, &averageRating,
     )
 
     if err != nil {
@@ -273,8 +287,12 @@ func (h *JobHandler) GetJob(c *gin.Context) {
         "is_active":     isActive,
         "expires_at":    expiresAt,
         "created_at":    createdAt,
+        "average_rating": averageRating,
     }
 
+    if hiredWorkerID.Valid {
+        job["hired_worker_id"] = hiredWorkerID.Int64
+    }
     if categoryID.Valid {
         job["category_id"] = categoryID.Int64
     }
@@ -381,7 +399,7 @@ func (h *JobHandler) HireWorker(c *gin.Context) {
     _, err = tx.Exec(context.Background(), `UPDATE jobs SET status = 'closed', hired_worker_id = $1 WHERE id = $2`, workerID, jobID)
     if err != nil { c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update job"}); return }
 
-    _, err = tx.Exec(context.Background(), `UPDATE applications SET status = 'selected' WHERE job_id = $1 AND worker_id = $2`, jobID, workerID)
+    _, err = tx.Exec(context.Background(), `UPDATE applications SET status = 'accepted' WHERE job_id = $1 AND worker_id = $2`, jobID, workerID)
     if err != nil { c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update selected application"}); return }
     
     _, err = tx.Exec(context.Background(), `UPDATE applications SET status = 'rejected' WHERE job_id = $1 AND worker_id != $2`, jobID, workerID)

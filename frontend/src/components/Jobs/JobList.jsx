@@ -116,7 +116,12 @@ function JobList() {
                 <h3>{job.title}</h3>
                 {job.category_name && <span className="badge badge-primary">{job.category_name}</span>}
               </div>
-              <p className="job-employer">Posted by: <strong>{job.employer_name}</strong></p>
+              <p className="job-employer">
+                Posted by: <strong>{job.employer_name}</strong>
+                <span style={{ fontSize: '0.85em', color: '#666', marginLeft: '8px' }}>
+                  {job.average_rating > 0 ? `★ ${Number(job.average_rating).toFixed(1)}/5.0` : '(No ratings yet)'}
+                </span>
+              </p>
               
               <div className="job-meta">
                 <span className="meta-item">📍 {job.location}</span>
@@ -157,7 +162,12 @@ function JobList() {
               <div className="job-detail-grid">
                 <div className="detail-item">
                   <span className="detail-label">Employer</span>
-                  <span>{selectedJob.employer_name}</span>
+                  <span>
+                    {selectedJob.employer_name}
+                    <span style={{ fontSize: '0.85em', color: '#666', marginLeft: '8px' }}>
+                      {selectedJob.average_rating > 0 ? `★ ${Number(selectedJob.average_rating).toFixed(1)}` : '(No ratings)'}
+                    </span>
+                  </span>
                 </div>
                 <div className="detail-item">
                   <span className="detail-label">Location</span>

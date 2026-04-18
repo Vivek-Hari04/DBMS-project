@@ -204,6 +204,7 @@ func (h *ApplicationHandler) GetWorkerApplications(c *gin.Context) {
     query := `
         SELECT a.id, a.job_id, a.worker_id, a.cover_letter, a.status, a.applied_at,
                j.title as job_title, j.location, j.salary_min, j.salary_max,
+               j.status as job_status, j.employer_id, j.hired_worker_id,
                u.full_name as employer_name
         FROM applications a
         JOIN jobs j ON a.job_id = j.id
@@ -224,15 +225,19 @@ func (h *ApplicationHandler) GetWorkerApplications(c *gin.Context) {
     for rows.Next() {
         var (
             id, jobID, workerID int
-            status, jobTitle, location, employerName string
+            status, jobTitle, location, jobStatus, employerName string
             coverLetter sql.NullString
             salaryMin, salaryMax sql.NullFloat64
+            employerID int
+            hiredWorkerID sql.NullInt64
             appliedAt time.Time
         )
 
         err := rows.Scan(
             &id, &jobID, &workerID, &coverLetter, &status, &appliedAt,
-            &jobTitle, &location, &salaryMin, &salaryMax, &employerName,
+            &jobTitle, &location, &salaryMin, &salaryMax,
+            &jobStatus, &employerID, &hiredWorkerID,
+            &employerName,
         )
 
         if err != nil {
@@ -247,6 +252,8 @@ func (h *ApplicationHandler) GetWorkerApplications(c *gin.Context) {
             "applied_at":    appliedAt,
             "job_title":     jobTitle,
             "location":      location,
+            "job_status":    jobStatus,
+            "employer_id":   employerID,
             "employer_name": employerName,
         }
 
@@ -258,6 +265,9 @@ func (h *ApplicationHandler) GetWorkerApplications(c *gin.Context) {
         }
         if salaryMax.Valid {
             app["salary_max"] = salaryMax.Float64
+        }
+        if hiredWorkerID.Valid {
+            app["hired_worker_id"] = hiredWorkerID.Int64
         }
 
         applications = append(applications, app)
@@ -276,7 +286,8 @@ func (h *ApplicationHandler) GetJobApplications(c *gin.Context) {
     query := `
         SELECT a.id, a.job_id, a.worker_id, a.cover_letter, a.status, a.applied_at,
                u.full_name as worker_name, u.email as worker_email, 
-               u.phone as worker_phone, u.location as worker_location
+               u.phone as worker_phone, u.location as worker_location, u.profile_pic,
+               COALESCE((SELECT AVG(rating) FROM ratings WHERE reviewee_id = a.worker_id), 0) as average_rating
         FROM applications a
         JOIN users u ON a.worker_id = u.id
         WHERE a.job_id = $1
@@ -296,13 +307,14 @@ func (h *ApplicationHandler) GetJobApplications(c *gin.Context) {
         var (
             id, jobID, workerID int
             status, workerName, workerEmail string
-            coverLetter, workerPhone, workerLocation sql.NullString
+            coverLetter, workerPhone, workerLocation, profilePic sql.NullString
             appliedAt time.Time
+            averageRating float64
         )
 
         err := rows.Scan(
             &id, &jobID, &workerID, &coverLetter, &status, &appliedAt,
-            &workerName, &workerEmail, &workerPhone, &workerLocation,
+            &workerName, &workerEmail, &workerPhone, &workerLocation, &profilePic, &averageRating,
         )
 
         if err != nil {
@@ -317,6 +329,7 @@ func (h *ApplicationHandler) GetJobApplications(c *gin.Context) {
             "applied_at":   appliedAt,
             "worker_name":  workerName,
             "worker_email": workerEmail,
+            "average_rating": averageRating,
         }
 
         if coverLetter.Valid {
@@ -327,6 +340,9 @@ func (h *ApplicationHandler) GetJobApplications(c *gin.Context) {
         }
         if workerLocation.Valid {
             app["worker_location"] = workerLocation.String
+        }
+        if profilePic.Valid {
+            app["profile_pic"] = profilePic.String
         }
 
         applications = append(applications, app)
@@ -342,51 +358,144 @@ func (h *ApplicationHandler) GetJobApplications(c *gin.Context) {
 func (h *ApplicationHandler) UpdateApplicationStatus(c *gin.Context) {
     applicationID := c.Param("id")
 
+    employerIDRaw, exists := c.Get("user_id")
+    if !exists {
+        c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+        return
+    }
+    var employerID int
+    switch v := employerIDRaw.(type) {
+    case float64:
+        employerID = int(v)
+    case int:
+        employerID = v
+    default:
+        c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+        return
+    }
+
     var req UpdateApplicationRequest
     if err := c.ShouldBindJSON(&req); err != nil {
         c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
         return
     }
 
-    query := `
-        UPDATE applications
-        SET status = $1, updated_at = NOW()
-        WHERE id = $2
-        RETURNING id, job_id, worker_id, status, updated_at
-    `
-
-    var application struct {
-        ID        int
-        JobID     int
-        WorkerID  int
-        Status    string
-        UpdatedAt time.Time
-    }
-
-    err := h.DB.QueryRow(context.Background(), query, req.Status, applicationID).Scan(
-        &application.ID,
-        &application.JobID,
-        &application.WorkerID,
-        &application.Status,
-        &application.UpdatedAt,
+    // Validate ownership and current state.
+    var (
+        jobID        int
+        workerID     int
+        currentStatus string
+        jobStatus     string
     )
-
+    err := h.DB.QueryRow(
+        context.Background(),
+        `
+        SELECT a.job_id, a.worker_id, a.status, j.status
+        FROM applications a
+        JOIN jobs j ON a.job_id = j.id
+        WHERE a.id = $1 AND j.employer_id = $2
+        `,
+        applicationID, employerID,
+    ).Scan(&jobID, &workerID, &currentStatus, &jobStatus)
     if err != nil {
-        c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update application"})
+        c.JSON(http.StatusNotFound, gin.H{"error": "Application not found or not authorized"})
         return
     }
 
-    var workerID int
+    if currentStatus != "pending" {
+        c.JSON(http.StatusBadRequest, gin.H{"error": "Only pending applications can be updated"})
+        return
+    }
+
+    // Reject: just update the application status.
+    if req.Status == "rejected" {
+        var updated struct {
+            ID        int
+            JobID     int
+            WorkerID  int
+            Status    string
+            UpdatedAt time.Time
+        }
+        err = h.DB.QueryRow(
+            context.Background(),
+            `
+            UPDATE applications
+            SET status = $1, updated_at = NOW()
+            WHERE id = $2
+            RETURNING id, job_id, worker_id, status, updated_at
+            `,
+            req.Status, applicationID,
+        ).Scan(&updated.ID, &updated.JobID, &updated.WorkerID, &updated.Status, &updated.UpdatedAt)
+        if err != nil {
+            c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update application"})
+            return
+        }
+
+        var jobTitle string
+        _ = h.DB.QueryRow(context.Background(), `SELECT title FROM jobs WHERE id = $1`, jobID).Scan(&jobTitle)
+        _, _ = h.DB.Exec(context.Background(), `
+            INSERT INTO notifications (user_id, type, title, message) 
+            VALUES ($1, 'status_updated', 'Application Update', 'Your application for "' || $2 || '" has been rejected')
+        `, workerID, jobTitle)
+
+        c.JSON(http.StatusOK, gin.H{
+            "message":     "Application status updated",
+            "application": updated,
+        })
+        return
+    }
+
+    // Accepted: close the job, set hired_worker_id, accept this application, reject others.
+    if jobStatus != "open" {
+        c.JSON(http.StatusBadRequest, gin.H{"error": "Job is already closed or not accepting updates"})
+        return
+    }
+
+    tx, err := h.DB.Begin(context.Background())
+    if err != nil {
+        c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to start transaction"})
+        return
+    }
+    defer tx.Rollback(context.Background())
+
+    _, err = tx.Exec(context.Background(), `UPDATE jobs SET status = 'closed', hired_worker_id = $1 WHERE id = $2`, workerID, jobID)
+    if err != nil {
+        c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update job"})
+        return
+    }
+
+    _, err = tx.Exec(context.Background(), `UPDATE applications SET status = 'accepted', updated_at = NOW() WHERE id = $1`, applicationID)
+    if err != nil {
+        c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update selected application"})
+        return
+    }
+
+    _, err = tx.Exec(context.Background(), `UPDATE applications SET status = 'rejected', updated_at = NOW() WHERE job_id = $1 AND id != $2 AND status = 'pending'`, jobID, applicationID)
+    if err != nil {
+        c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to reject remaining applications"})
+        return
+    }
+
+    if err = tx.Commit(context.Background()); err != nil {
+        c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to commit transaction"})
+        return
+    }
+
     var jobTitle string
-    h.DB.QueryRow(context.Background(), `SELECT a.worker_id, j.title FROM applications a JOIN jobs j ON a.job_id = j.id WHERE a.id = $1`, applicationID).Scan(&workerID, &jobTitle)
+    _ = h.DB.QueryRow(context.Background(), `SELECT title FROM jobs WHERE id = $1`, jobID).Scan(&jobTitle)
     
-    h.DB.Exec(context.Background(), `
+    _, _ = h.DB.Exec(context.Background(), `
         INSERT INTO notifications (user_id, type, title, message) 
-        VALUES ($1, 'status_updated', 'Application Update', 'Your application for "' || $2 || '" has been ' || $3)
-    `, workerID, jobTitle, req.Status)
+        VALUES ($1, 'status_updated', 'You were Hired!', 'Congratulations! You have been hired for "' || $2 || '".')
+    `, workerID, jobTitle)
 
     c.JSON(http.StatusOK, gin.H{
-        "message": "Application status updated",
-        "application": application,
+        "message": "Application accepted and job closed",
+        "application": gin.H{
+            "id":        applicationID,
+            "job_id":    jobID,
+            "worker_id": workerID,
+            "status":    "accepted",
+        },
     })
 }

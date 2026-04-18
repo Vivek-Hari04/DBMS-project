@@ -131,14 +131,27 @@ function MyJobs() {
                     {job.status === 'closed' && (
                       <button 
                         onClick={() => {
-                          // we would ideally need hired_worker_id from job to rate them
-                          // Since we didn't inject hired_worker_id into GetJob response yet, we can fetch it or inject it 
-                          // A small workaround if we don't have it -> redirect to applications which show hired worker
                           setSelectedJobId(job.id)
                         }} 
                         className="btn btn-primary text-sm mr-2"
                       >
-                        Hired Worker
+                        View Details
+                      </button>
+                    )}
+                    {job.status === 'closed' && job.hired_worker_id && (
+                      <button
+                        onClick={() =>
+                          setRatingModal({
+                            show: true,
+                            jobId: job.id,
+                            revieweeId: job.hired_worker_id,
+                            rating: 5,
+                            review: '',
+                          })
+                        }
+                        className="btn btn-secondary text-sm mr-2"
+                      >
+                        Rate Worker
                       </button>
                     )}
                     <button 
@@ -153,6 +166,72 @@ function MyJobs() {
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {ratingModal.show && (
+        <div
+          className="modal-overlay"
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 50,
+          }}
+          onClick={() => setRatingModal({ show: false, jobId: null, revieweeId: null, rating: 5, review: '' })}
+        >
+          <div
+            className="card"
+            style={{ width: 520, maxWidth: '92vw', padding: '1.25rem' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="section-title" style={{ marginBottom: '0.75rem' }}>Rate Worker</h3>
+            <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+              {[1, 2, 3, 4, 5].map((n) => (
+                <button
+                  key={n}
+                  type="button"
+                  className="btn btn-secondary text-sm"
+                  onClick={() => setRatingModal((m) => ({ ...m, rating: n }))}
+                  style={{
+                    background: ratingModal.rating >= n ? '#2563eb' : undefined,
+                    color: ratingModal.rating >= n ? 'white' : undefined,
+                    border: 'none',
+                  }}
+                >
+                  {n}★
+                </button>
+              ))}
+            </div>
+            <textarea
+              value={ratingModal.review}
+              onChange={(e) => setRatingModal((m) => ({ ...m, review: e.target.value }))}
+              placeholder="Optional review"
+              className="w-full"
+              style={{
+                width: '100%',
+                minHeight: 110,
+                border: '1px solid #e5e7eb',
+                borderRadius: 6,
+                padding: 10,
+                marginBottom: 12,
+              }}
+            />
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+              <button
+                className="btn btn-secondary text-sm"
+                onClick={() => setRatingModal({ show: false, jobId: null, revieweeId: null, rating: 5, review: '' })}
+              >
+                Cancel
+              </button>
+              <button className="btn btn-primary text-sm" onClick={submitRating}>
+                Submit Rating
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

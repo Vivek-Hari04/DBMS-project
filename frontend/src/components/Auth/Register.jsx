@@ -11,7 +11,9 @@ const INITIAL_FORM = {
   password: '',
   user_type: '',   // intentionally empty so the user must make an explicit choice
   phone: '',
+  phone: '',
   location: '',
+  profile_pic: '',
 };
 
 function Register() {
@@ -228,6 +230,20 @@ function Register() {
               placeholder="City, State"
               className="field-input"
               autoComplete="address-level2"
+            />
+          </div>
+
+          {/* Profile Pic URL (optional) */}
+          <div className="field-group">
+            <label htmlFor="reg-profile_pic" className="field-label">Profile Pic URL (optional)</label>
+            <input
+              id="reg-profile_pic"
+              type="url"
+              name="profile_pic"
+              value={formData.profile_pic}
+              onChange={handleChange}
+              placeholder="https://example.com/pic.jpg"
+              className="field-input"
             />
           </div>
 
