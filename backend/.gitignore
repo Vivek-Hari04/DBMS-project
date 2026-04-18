@@ -1,1 +1,22 @@
+# env
 .env
+
+# binaries (Go build output)
+main
+web_backend
+*.exe
+*.out
+
+# logs
+*.log
+
+# temp / cache
+tmp/
+temp/
+
+# sensitive files
+employer_token.json
+worker_token.json
+
+# OS
+.DS_Store
