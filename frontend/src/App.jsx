@@ -14,6 +14,7 @@ import JobList from './components/Jobs/JobList';
 import MyJobs from './components/Jobs/MyJobs';
 import CreateJob from './components/Jobs/CreateJob';
 import MyApplications from './components/Jobs/MyApplications';
+import BrowseWorkers from './components/Workers/BrowseWorkers';
 
 // CSS
 import './App.css';
@@ -49,6 +50,7 @@ function App() {
           <Route index element={<HomePage />} />
           <Route path="profile" element={<ProfilePage />} />
           <Route path="jobs" element={<JobList />} />
+          <Route path="workers" element={<BrowseWorkers />} />
           <Route path="my-jobs" element={<MyJobs />} />
           <Route path="create-job" element={<CreateJob />} />
           <Route path="applications" element={<MyApplications />} />

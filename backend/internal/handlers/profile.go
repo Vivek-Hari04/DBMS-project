@@ -82,6 +82,7 @@ func (h *ProfileHandler) UpdateProfile(c *gin.Context) {
         Phone    string `json:"phone"`
         Location string `json:"location"`
         Bio      string `json:"bio"`
+        AvatarURL string `json:"avatar_url"`
     }
     
     if err := c.ShouldBindJSON(&req); err != nil {
@@ -91,8 +92,8 @@ func (h *ProfileHandler) UpdateProfile(c *gin.Context) {
     
     query := `
         UPDATE users
-        SET full_name = $1, phone = $2, location = $3, bio = $4
-        WHERE id = $5
+        SET full_name = $1, phone = $2, location = $3, bio = $4, avatar_url = $5
+        WHERE id = $6
         RETURNING id, email, full_name, user_type, phone, location, bio, avatar_url, created_at
     `
     
@@ -100,7 +101,7 @@ func (h *ProfileHandler) UpdateProfile(c *gin.Context) {
     var phone, location, bio, avatarURL sql.NullString
     
     err := h.DB.QueryRow(context.Background(), query,
-        req.FullName, req.Phone, req.Location, req.Bio, userID,
+        req.FullName, req.Phone, req.Location, req.Bio, req.AvatarURL, userID,
     ).Scan(
         &profile.ID,
         &profile.Email,

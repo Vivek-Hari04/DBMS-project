@@ -3,19 +3,23 @@ import { useAuth } from '../context/AuthContext';
 import { profileAPI } from '../services/api';
 import toast from 'react-hot-toast';
 import './ProfilePage.css';
+import StructuredLocationField from '../components/Location/StructuredLocationField';
 
 function ProfilePage() {
-  const { user, logout } = useAuth();
+  const { user, logout, updateUser } = useAuth();
   const [profile, setProfile] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deletePassword, setDeletePassword] = useState('');
+  const [useCurrentLocation, setUseCurrentLocation] = useState(true);
+  const [originalLocation, setOriginalLocation] = useState('');
   
   const [formData, setFormData] = useState({
     full_name: '',
     phone: '',
     location: '',
     bio: '',
+    avatar_url: '',
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -32,11 +36,14 @@ function ProfilePage() {
       const response = await profileAPI.getProfile(user.id);
       const data = response.data.profile || response.data; // Depending on actual API response format
       setProfile(data);
+      setOriginalLocation(data.location || '');
+      setUseCurrentLocation(!!data.location);
       setFormData({
         full_name: data.full_name || '',
         phone: data.phone || '',
         location: data.location || '',
         bio: data.bio || '',
+        avatar_url: data.avatar_url || '',
       });
     } catch (err) {
       setError('Failed to load profile. Please try again later.');
@@ -58,8 +65,18 @@ function ProfilePage() {
     setError('');
     
     try {
-      const response = await profileAPI.updateProfile(user.id, formData);
-      setProfile(response.data.profile || formData);
+      const payload = {
+        ...formData,
+        location: useCurrentLocation ? formData.location : originalLocation,
+      };
+      const response = await profileAPI.updateProfile(user.id, payload);
+      const nextProfile = response.data.profile || formData;
+      setProfile(nextProfile);
+      // keep dashboard avatar/name in sync without re-login
+      updateUser({
+        full_name: nextProfile.full_name,
+        avatar_url: nextProfile.avatar_url,
+      });
       setIsEditing(false);
       setSuccess('Profile updated successfully!');
       
@@ -106,6 +123,39 @@ function ProfilePage() {
 
         {!isEditing ? (
           <div className="profile-view">
+            <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 16 }}>
+              {profile?.avatar_url ? (
+                <img
+                  src={profile.avatar_url}
+                  alt="avatar"
+                  style={{ width: 72, height: 72, borderRadius: '50%', objectFit: 'cover' }}
+                  onError={(e) => {
+                    e.currentTarget.style.display = 'none';
+                  }}
+                />
+              ) : (
+                <div
+                  style={{
+                    width: 72,
+                    height: 72,
+                    borderRadius: '50%',
+                    background: '#eaebef',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontWeight: 700,
+                    color: '#6d7280',
+                    fontSize: 28,
+                  }}
+                >
+                  {profile?.full_name ? profile.full_name.charAt(0).toUpperCase() : '?'}
+                </div>
+              )}
+              <div>
+                <div style={{ fontWeight: 700, fontSize: 18 }}>{profile?.full_name}</div>
+                <div style={{ color: '#6b7280' }}>{profile?.email}</div>
+              </div>
+            </div>
             <div className="profile-grid">
               <div className="profile-field">
                 <span className="field-label">Full Name</span>
@@ -152,6 +202,17 @@ function ProfilePage() {
           <form onSubmit={handleSubmit} className="profile-form">
             <div className="form-grid">
               <div className="form-group">
+                <label className="form-label">Profile Image URL</label>
+                <input
+                  type="url"
+                  name="avatar_url"
+                  value={formData.avatar_url}
+                  onChange={handleChange}
+                  className="form-input"
+                  placeholder="https://example.com/avatar.jpg"
+                />
+              </div>
+              <div className="form-group">
                 <label className="form-label">Full Name</label>
                 <input
                   type="text"
@@ -177,14 +238,23 @@ function ProfilePage() {
 
               <div className="form-group">
                 <label className="form-label">Location</label>
-                <input
-                  type="text"
-                  name="location"
-                  value={formData.location}
-                  onChange={handleChange}
-                  className="form-input"
-                  placeholder="City, State"
-                />
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#374151' }}>
+                    <input
+                      type="checkbox"
+                      checked={useCurrentLocation}
+                      onChange={(e) => setUseCurrentLocation(e.target.checked)}
+                    />
+                    Set as my current location
+                  </label>
+                </div>
+                <div style={{ marginTop: 10 }}>
+                  <StructuredLocationField
+                    value={formData.location}
+                    onChange={(locStr) => setFormData((prev) => ({ ...prev, location: locStr }))}
+                    disabled={!useCurrentLocation}
+                  />
+                </div>
               </div>
             </div>
 

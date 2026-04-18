@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { authAPI } from '../../services/api';
+import StructuredLocationField from '../Location/StructuredLocationField';
 import './Register.css';
 
 // Strict allowlist — these are the ONLY valid user types accepted by the API
@@ -11,9 +12,8 @@ const INITIAL_FORM = {
   password: '',
   user_type: '',   // intentionally empty so the user must make an explicit choice
   phone: '',
-  phone: '',
   location: '',
-  profile_pic: '',
+  avatar_url: '',
 };
 
 function Register() {
@@ -22,6 +22,9 @@ function Register() {
   const [apiError, setApiError]   = useState('');
   const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
+  const [useCurrentLocation, setUseCurrentLocation] = useState(false);
+
+  const computedLocation = useMemo(() => formData.location, [formData.location]);
 
   // ── Field-level validation ────────────────────────────────────────────────
   const validate = (data) => {
@@ -76,10 +79,15 @@ function Register() {
 
     try {
       // POST to /api/register via the centralised axios instance
-      await authAPI.register(formData);
+      const payload = {
+        ...formData,
+        location: useCurrentLocation ? computedLocation : '',
+      };
+      await authAPI.register(payload);
 
       setSuccess('Registration successful! You can now log in.');
       setFormData(INITIAL_FORM);
+      setUseCurrentLocation(false);
       setErrors({});
     } catch (err) {
       // Prefer the API's error message; fall back to a generic string
@@ -220,27 +228,34 @@ function Register() {
 
           {/* Location (optional) */}
           <div className="field-group">
-            <label htmlFor="reg-location" className="field-label">Location</label>
-            <input
-              id="reg-location"
-              type="text"
-              name="location"
-              value={formData.location}
-              onChange={handleChange}
-              placeholder="City, State"
-              className="field-input"
-              autoComplete="address-level2"
-            />
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+              <label className="field-label" style={{ margin: 0 }}>Current Location</label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#374151' }}>
+                <input
+                  type="checkbox"
+                  checked={useCurrentLocation}
+                  onChange={(e) => setUseCurrentLocation(e.target.checked)}
+                />
+                Set as my current location
+              </label>
+            </div>
+            <div style={{ marginTop: 10 }}>
+              <StructuredLocationField
+                value={formData.location}
+                onChange={(locStr) => setFormData((prev) => ({ ...prev, location: locStr }))}
+                disabled={!useCurrentLocation}
+              />
+            </div>
           </div>
 
-          {/* Profile Pic URL (optional) */}
+          {/* Profile Image URL (optional) */}
           <div className="field-group">
-            <label htmlFor="reg-profile_pic" className="field-label">Profile Pic URL (optional)</label>
+            <label htmlFor="reg-avatar_url" className="field-label">Profile Image URL (optional)</label>
             <input
-              id="reg-profile_pic"
+              id="reg-avatar_url"
               type="url"
-              name="profile_pic"
-              value={formData.profile_pic}
+              name="avatar_url"
+              value={formData.avatar_url}
               onChange={handleChange}
               placeholder="https://example.com/pic.jpg"
               className="field-input"

@@ -1,10 +1,13 @@
-import { useState } from 'react';
-import { jobAPI } from '../../services/api';
+import { useEffect, useState } from 'react';
+import { jobAPI, profileAPI } from '../../services/api';
 import './Jobs.css';
 import { useNavigate } from 'react-router-dom';
+import StructuredLocationField from '../Location/StructuredLocationField';
+import { useAuth } from '../../context/AuthContext';
 
 function CreateJob() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -22,6 +25,7 @@ function CreateJob() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [useProfileLocation, setUseProfileLocation] = useState(false);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -32,6 +36,23 @@ function CreateJob() {
         : value,
     }));
   };
+
+  useEffect(() => {
+    const run = async () => {
+      if (!useProfileLocation) return;
+      try {
+        if (!user?.id) return;
+        const res = await profileAPI.getProfile(user.id);
+        const p = res.data.profile || res.data;
+        if (p?.location) {
+          setFormData((prev) => ({ ...prev, location: p.location }));
+        }
+      } catch (e) {
+        // silent; user can still fill manually
+      }
+    };
+    run();
+  }, [useProfileLocation, user?.id]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -91,16 +112,26 @@ function CreateJob() {
 
           {/* Details */}
           <div className="form-group">
-            <label className="form-label">Location <span className="text-red-500">*</span></label>
-            <input
-              type="text"
-              name="location"
-              value={formData.location}
-              onChange={handleChange}
-              className="form-input w-full"
-              required
-              placeholder="City, Neighborhood"
-            />
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+              <label className="form-label" style={{ margin: 0 }}>
+                Location <span className="text-red-500">*</span>
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#374151' }}>
+                <input
+                  type="checkbox"
+                  checked={useProfileLocation}
+                  onChange={(e) => setUseProfileLocation(e.target.checked)}
+                />
+                Use my profile location
+              </label>
+            </div>
+            <div style={{ marginTop: 10 }}>
+              <StructuredLocationField
+                value={formData.location}
+                onChange={(locStr) => setFormData((prev) => ({ ...prev, location: locStr }))}
+                required
+              />
+            </div>
           </div>
 
           <div className="form-group">

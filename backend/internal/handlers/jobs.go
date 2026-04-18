@@ -8,6 +8,7 @@ import (
     "github.com/gin-gonic/gin"
     "github.com/jackc/pgx/v5/pgxpool"
     "strconv"
+    "strings"
 )
 
 type JobHandler struct {
@@ -27,6 +28,25 @@ type CreateJobRequest struct {
     ContactPhone string   `json:"contact_phone"`
     ContactEmail string   `json:"contact_email"`
     ExpiryDays   int      `json:"expiry_days" binding:"required,min=1,max=7"` // 1-7 days
+}
+
+type CreateOfferRequest struct {
+    WorkerID     int     `json:"worker_id" binding:"required"`
+    Title        string  `json:"title" binding:"required"`
+    Description  string  `json:"description" binding:"required"`
+    CategoryID   *int    `json:"category_id"`
+    Location     string  `json:"location" binding:"required"`
+    SalaryMin    *float64 `json:"salary_min"`
+    SalaryMax    *float64 `json:"salary_max"`
+    Duration     string  `json:"duration"`
+    Requirements string  `json:"requirements"`
+    ContactPhone string  `json:"contact_phone"`
+    ContactEmail string  `json:"contact_email"`
+    ExpiryDays   int     `json:"expiry_days" binding:"required,min=1,max=7"`
+}
+
+type OfferResponseRequest struct {
+    Action string `json:"action" binding:"required,oneof=accept reject"`
 }
 
 // Create new job posting
@@ -144,7 +164,7 @@ func (h *JobHandler) GetJobs(c *gin.Context) {
         FROM jobs j
         JOIN users u ON j.employer_id = u.id
         LEFT JOIN categories c ON j.category_id = c.id
-        WHERE j.is_active = true 
+        WHERE j.is_active = true AND (j.is_private = false OR j.is_private IS NULL)
         ORDER BY j.created_at DESC
     `
 
@@ -233,6 +253,129 @@ func (h *JobHandler) GetJobs(c *gin.Context) {
     })
 }
 
+// Search active jobs by keyword and/or location (ILIKE).
+// Query params:
+// - q: matches title or description
+// - location: matches location string
+func (h *JobHandler) SearchJobs(c *gin.Context) {
+    q := strings.TrimSpace(c.Query("q"))
+    loc := strings.TrimSpace(c.Query("location"))
+
+    baseQuery := `
+        SELECT j.id, j.employer_id, j.title, j.description, j.category_id, j.location,
+               j.salary_min, j.salary_max, j.duration, j.requirements,
+               j.contact_phone, j.contact_email, j.expires_at, j.status, j.is_active, j.created_at,
+               j.hired_worker_id,
+               u.full_name as employer_name,
+               c.name as category_name,
+               COALESCE((SELECT AVG(rating) FROM ratings WHERE reviewee_id = j.employer_id), 0) as average_rating
+        FROM jobs j
+        JOIN users u ON j.employer_id = u.id
+        LEFT JOIN categories c ON j.category_id = c.id
+        WHERE j.is_active = true AND (j.is_private = false OR j.is_private IS NULL)
+    `
+
+    var args []interface{}
+    argN := 1
+
+    if q != "" {
+        baseQuery += ` AND (j.title ILIKE $` + strconv.Itoa(argN) + ` OR j.description ILIKE $` + strconv.Itoa(argN) + `)`
+        args = append(args, "%"+q+"%")
+        argN++
+    }
+
+    if loc != "" {
+        baseQuery += ` AND j.location ILIKE $` + strconv.Itoa(argN)
+        args = append(args, "%"+loc+"%")
+        argN++
+    }
+
+    baseQuery += ` ORDER BY j.created_at DESC`
+
+    rows, err := h.DB.Query(context.Background(), baseQuery, args...)
+    if err != nil {
+        c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to search jobs"})
+        return
+    }
+    defer rows.Close()
+
+    var jobs []map[string]interface{}
+
+    for rows.Next() {
+        var (
+            id, employerID int
+            title, description, location, status, employerName string
+            categoryID sql.NullInt64
+            salaryMin, salaryMax sql.NullFloat64
+            duration, requirements, contactPhone, contactEmail, categoryName sql.NullString
+            expiresAt, createdAt time.Time
+            isActive bool
+            hiredWorkerID sql.NullInt64
+            averageRating float64
+        )
+
+        err := rows.Scan(
+            &id, &employerID, &title, &description, &categoryID, &location,
+            &salaryMin, &salaryMax, &duration, &requirements,
+            &contactPhone, &contactEmail, &expiresAt, &status, &isActive, &createdAt,
+            &hiredWorkerID,
+            &employerName, &categoryName, &averageRating,
+        )
+        if err != nil {
+            continue
+        }
+
+        job := map[string]interface{}{
+            "id":             id,
+            "employer_id":    employerID,
+            "employer_name":  employerName,
+            "title":          title,
+            "description":    description,
+            "location":       location,
+            "status":         status,
+            "is_active":      isActive,
+            "expires_at":     expiresAt,
+            "created_at":     createdAt,
+            "average_rating": averageRating,
+        }
+
+        if hiredWorkerID.Valid {
+            job["hired_worker_id"] = hiredWorkerID.Int64
+        }
+        if categoryID.Valid {
+            job["category_id"] = categoryID.Int64
+        }
+        if categoryName.Valid {
+            job["category_name"] = categoryName.String
+        }
+        if salaryMin.Valid {
+            job["salary_min"] = salaryMin.Float64
+        }
+        if salaryMax.Valid {
+            job["salary_max"] = salaryMax.Float64
+        }
+        if duration.Valid {
+            job["duration"] = duration.String
+        }
+        if requirements.Valid {
+            job["requirements"] = requirements.String
+        }
+        if contactPhone.Valid {
+            job["contact_phone"] = contactPhone.String
+        }
+        if contactEmail.Valid {
+            job["contact_email"] = contactEmail.String
+        }
+
+        jobs = append(jobs, job)
+    }
+
+    c.JSON(http.StatusOK, gin.H{
+        "jobs":  jobs,
+        "count": len(jobs),
+    })
+}
+
 // Get single job by ID
 func (h *JobHandler) GetJob(c *gin.Context) {
     jobID := c.Param("id")
@@ -248,7 +391,7 @@ func (h *JobHandler) GetJob(c *gin.Context) {
         FROM jobs j
         JOIN users u ON j.employer_id = u.id
         LEFT JOIN categories c ON j.category_id = c.id
-        WHERE j.id = $1
+        WHERE j.id = $1 AND (j.is_private = false OR j.is_private IS NULL)
     `
 
     var (
@@ -319,6 +462,381 @@ func (h *JobHandler) GetJob(c *gin.Context) {
     }
 
     c.JSON(http.StatusOK, job)
+}
+
+// Employer: list my jobs including private offers.
+func (h *JobHandler) GetMyJobs(c *gin.Context) {
+    employerIDRaw, exists := c.Get("user_id")
+    if !exists {
+        c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+        return
+    }
+    var employerID int
+    switch v := employerIDRaw.(type) {
+    case float64:
+        employerID = int(v)
+    case int:
+        employerID = v
+    default:
+        c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+        return
+    }
+
+    query := `
+        SELECT j.id, j.employer_id, j.title, j.description, j.category_id, j.location,
+               j.salary_min, j.salary_max, j.duration, j.requirements,
+               j.contact_phone, j.contact_email, j.expires_at, j.status, j.is_active, j.created_at,
+               j.hired_worker_id, j.is_private, j.assigned_worker_id,
+               u.full_name as employer_name,
+               c.name as category_name,
+               COALESCE((SELECT AVG(rating) FROM ratings WHERE reviewee_id = j.employer_id), 0) as average_rating
+        FROM jobs j
+        JOIN users u ON j.employer_id = u.id
+        LEFT JOIN categories c ON j.category_id = c.id
+        WHERE j.is_active = true AND j.employer_id = $1
+        ORDER BY j.created_at DESC
+    `
+
+    rows, err := h.DB.Query(context.Background(), query, employerID)
+    if err != nil {
+        c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch jobs"})
+        return
+    }
+    defer rows.Close()
+
+    var jobs []map[string]interface{}
+    for rows.Next() {
+        var (
+            id, empID int
+            title, description, location, status, employerName string
+            categoryID sql.NullInt64
+            salaryMin, salaryMax sql.NullFloat64
+            duration, requirements, contactPhone, contactEmail, categoryName sql.NullString
+            expiresAt, createdAt time.Time
+            isActive bool
+            hiredWorkerID sql.NullInt64
+            isPrivate bool
+            assignedWorkerID sql.NullInt64
+            averageRating float64
+        )
+
+        err := rows.Scan(
+            &id, &empID, &title, &description, &categoryID, &location,
+            &salaryMin, &salaryMax, &duration, &requirements,
+            &contactPhone, &contactEmail, &expiresAt, &status, &isActive, &createdAt,
+            &hiredWorkerID, &isPrivate, &assignedWorkerID,
+            &employerName, &categoryName, &averageRating,
+        )
+        if err != nil {
+            continue
+        }
+
+        job := map[string]interface{}{
+            "id":             id,
+            "employer_id":    empID,
+            "employer_name":  employerName,
+            "title":          title,
+            "description":    description,
+            "location":       location,
+            "status":         status,
+            "is_active":      isActive,
+            "expires_at":     expiresAt,
+            "created_at":     createdAt,
+            "average_rating": averageRating,
+            "is_private":     isPrivate,
+        }
+        if hiredWorkerID.Valid {
+            job["hired_worker_id"] = hiredWorkerID.Int64
+        }
+        if assignedWorkerID.Valid {
+            job["assigned_worker_id"] = assignedWorkerID.Int64
+        }
+        if categoryID.Valid {
+            job["category_id"] = categoryID.Int64
+        }
+        if categoryName.Valid {
+            job["category_name"] = categoryName.String
+        }
+        if salaryMin.Valid {
+            job["salary_min"] = salaryMin.Float64
+        }
+        if salaryMax.Valid {
+            job["salary_max"] = salaryMax.Float64
+        }
+        if duration.Valid {
+            job["duration"] = duration.String
+        }
+        if requirements.Valid {
+            job["requirements"] = requirements.String
+        }
+        if contactPhone.Valid {
+            job["contact_phone"] = contactPhone.String
+        }
+        if contactEmail.Valid {
+            job["contact_email"] = contactEmail.String
+        }
+
+        jobs = append(jobs, job)
+    }
+
+    c.JSON(http.StatusOK, gin.H{"jobs": jobs, "count": len(jobs)})
+}
+
+// Employer: create a private job offer assigned to a specific worker.
+func (h *JobHandler) CreatePrivateOffer(c *gin.Context) {
+    employerIDRaw, exists := c.Get("user_id")
+    if !exists {
+        c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+        return
+    }
+    var employerID int
+    switch v := employerIDRaw.(type) {
+    case float64:
+        employerID = int(v)
+    case int:
+        employerID = v
+    default:
+        c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+        return
+    }
+
+    var req CreateOfferRequest
+    if err := c.ShouldBindJSON(&req); err != nil {
+        c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+        return
+    }
+
+    expiresAt := time.Now().AddDate(0, 0, req.ExpiryDays)
+
+    query := `
+        INSERT INTO jobs (
+            employer_id, title, description, category_id, location,
+            salary_min, salary_max, duration, requirements,
+            contact_phone, contact_email, expires_at,
+            is_private, assigned_worker_id
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, true, $13)
+        RETURNING id
+    `
+
+    var id int
+    err := h.DB.QueryRow(context.Background(), query,
+        employerID, req.Title, req.Description, req.CategoryID, req.Location,
+        req.SalaryMin, req.SalaryMax, req.Duration, req.Requirements,
+        req.ContactPhone, req.ContactEmail, expiresAt,
+        req.WorkerID,
+    ).Scan(&id)
+    if err != nil {
+        c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create offer"})
+        return
+    }
+
+    // Notify the worker
+    _, _ = h.DB.Exec(context.Background(), `
+        INSERT INTO notifications (user_id, type, title, message)
+        VALUES ($1, 'job_offer', 'New Job Offer', 'You have received a private job offer.')
+    `, req.WorkerID)
+
+    c.JSON(http.StatusCreated, gin.H{"message": "Offer created", "job_id": id})
+}
+
+// Worker: list private job offers assigned to me.
+func (h *JobHandler) GetMyOffers(c *gin.Context) {
+    workerIDRaw, exists := c.Get("user_id")
+    if !exists {
+        c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+        return
+    }
+    var workerID int
+    switch v := workerIDRaw.(type) {
+    case float64:
+        workerID = int(v)
+    case int:
+        workerID = v
+    default:
+        c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+        return
+    }
+
+    query := `
+        SELECT j.id, j.employer_id, j.title, j.description, j.category_id, j.location,
+               j.salary_min, j.salary_max, j.duration, j.requirements,
+               j.contact_phone, j.contact_email, j.expires_at, j.status, j.is_active, j.created_at,
+               j.hired_worker_id, j.is_private, j.assigned_worker_id,
+               u.full_name as employer_name,
+               c.name as category_name,
+               COALESCE((SELECT AVG(rating) FROM ratings WHERE reviewee_id = j.employer_id), 0) as average_rating
+        FROM jobs j
+        JOIN users u ON j.employer_id = u.id
+        LEFT JOIN categories c ON j.category_id = c.id
+        WHERE j.is_active = true
+          AND j.assigned_worker_id = $1
+        ORDER BY j.created_at DESC
+    `
+
+    rows, err := h.DB.Query(context.Background(), query, workerID)
+    if err != nil {
+        c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch offers"})
+        return
+    }
+    defer rows.Close()
+
+    var jobs []map[string]interface{}
+    for rows.Next() {
+        var (
+            id, employerID int
+            title, description, location, status, employerName string
+            categoryID sql.NullInt64
+            salaryMin, salaryMax sql.NullFloat64
+            duration, requirements, contactPhone, contactEmail, categoryName sql.NullString
+            expiresAt, createdAt time.Time
+            isActive bool
+            hiredWorkerID sql.NullInt64
+            isPrivate bool
+            assignedWorkerID sql.NullInt64
+            averageRating float64
+        )
+
+        err := rows.Scan(
+            &id, &employerID, &title, &description, &categoryID, &location,
+            &salaryMin, &salaryMax, &duration, &requirements,
+            &contactPhone, &contactEmail, &expiresAt, &status, &isActive, &createdAt,
+            &hiredWorkerID, &isPrivate, &assignedWorkerID,
+            &employerName, &categoryName, &averageRating,
+        )
+        if err != nil {
+            continue
+        }
+
+        job := map[string]interface{}{
+            "id":             id,
+            "employer_id":    employerID,
+            "employer_name":  employerName,
+            "title":          title,
+            "description":    description,
+            "location":       location,
+            "status":         status,
+            "is_active":      isActive,
+            "expires_at":     expiresAt,
+            "created_at":     createdAt,
+            "average_rating": averageRating,
+            "is_private":     isPrivate,
+        }
+        if hiredWorkerID.Valid {
+            job["hired_worker_id"] = hiredWorkerID.Int64
+        }
+        if assignedWorkerID.Valid {
+            job["assigned_worker_id"] = assignedWorkerID.Int64
+        }
+        if categoryID.Valid {
+            job["category_id"] = categoryID.Int64
+        }
+        if categoryName.Valid {
+            job["category_name"] = categoryName.String
+        }
+        if salaryMin.Valid {
+            job["salary_min"] = salaryMin.Float64
+        }
+        if salaryMax.Valid {
+            job["salary_max"] = salaryMax.Float64
+        }
+        if duration.Valid {
+            job["duration"] = duration.String
+        }
+        if requirements.Valid {
+            job["requirements"] = requirements.String
+        }
+        if contactPhone.Valid {
+            job["contact_phone"] = contactPhone.String
+        }
+        if contactEmail.Valid {
+            job["contact_email"] = contactEmail.String
+        }
+
+        jobs = append(jobs, job)
+    }
+
+    c.JSON(http.StatusOK, gin.H{"jobs": jobs, "count": len(jobs)})
+}
+
+// Worker: accept/reject a private offer.
+func (h *JobHandler) RespondToOffer(c *gin.Context) {
+    workerIDRaw, exists := c.Get("user_id")
+    if !exists {
+        c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+        return
+    }
+    var workerID int
+    switch v := workerIDRaw.(type) {
+    case float64:
+        workerID = int(v)
+    case int:
+        workerID = v
+    default:
+        c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+        return
+    }
+
+    jobID, err := strconv.Atoi(c.Param("id"))
+    if err != nil {
+        c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid job id"})
+        return
+    }
+
+    var req OfferResponseRequest
+    if err := c.ShouldBindJSON(&req); err != nil {
+        c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+        return
+    }
+
+    // Validate that this job is an open private offer assigned to this worker.
+    var employerID int
+    var status string
+    err = h.DB.QueryRow(context.Background(), `
+        SELECT employer_id, status
+        FROM jobs
+        WHERE id = $1 AND is_private = true AND assigned_worker_id = $2 AND is_active = true
+    `, jobID, workerID).Scan(&employerID, &status)
+    if err != nil {
+        c.JSON(http.StatusNotFound, gin.H{"error": "Offer not found"})
+        return
+    }
+    if status != "open" {
+        c.JSON(http.StatusBadRequest, gin.H{"error": "Offer is no longer open"})
+        return
+    }
+
+    if req.Action == "reject" {
+        _, err := h.DB.Exec(context.Background(), `
+            UPDATE jobs
+            SET status = 'closed'
+            WHERE id = $1 AND assigned_worker_id = $2
+        `, jobID, workerID)
+        if err != nil {
+            c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to reject offer"})
+            return
+        }
+        c.JSON(http.StatusOK, gin.H{"message": "Offer rejected"})
+        return
+    }
+
+    // accept
+    _, err = h.DB.Exec(context.Background(), `
+        UPDATE jobs
+        SET hired_worker_id = $1, status = 'closed'
+        WHERE id = $2 AND assigned_worker_id = $1
+    `, workerID, jobID)
+    if err != nil {
+        c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to accept offer"})
+        return
+    }
+
+    // notify employer
+    _, _ = h.DB.Exec(context.Background(), `
+        INSERT INTO notifications (user_id, type, title, message)
+        VALUES ($1, 'offer_accepted', 'Offer Accepted', 'Your private job offer was accepted.')
+    `, employerID)
+
+    c.JSON(http.StatusOK, gin.H{"message": "Offer accepted"})
 }
 
 // DeleteJob endpoint

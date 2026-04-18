@@ -88,15 +88,11 @@ function DashboardLayout() {
       { name: 'Browse Jobs', path: '/dashboard/jobs', icon: '🔍' },
       { name: 'My Applications', path: '/dashboard/applications', icon: '📝' }
     );
-  } else if (isCustomer) {
+  } else if (isCustomer || isShopkeeper) {
     navItems.push(
       { name: 'My Jobs', path: '/dashboard/my-jobs', icon: '🗂️' },
+      { name: 'Browse Workers', path: '/dashboard/workers', icon: '🧑‍🔧' },
       { name: 'Post a Job', path: '/dashboard/create-job', icon: '➕' }
-    );
-  } else if (isShopkeeper) {
-    navItems.push(
-      { name: 'Jobs', path: '/dashboard/jobs', icon: '🏢' },
-      { name: 'Applications', path: '/dashboard/applications', icon: '📬' }
     );
   }
 
@@ -208,7 +204,20 @@ function DashboardLayout() {
             </div>
 
             <div className="user-profile">
-              <div className="avatar">{user.full_name.charAt(0).toUpperCase()}</div>
+              {user?.avatar_url ? (
+                <img
+                  src={user.avatar_url}
+                  alt="avatar"
+                  className="avatar"
+                  style={{ width: 40, height: 40, borderRadius: '50%', objectFit: 'cover' }}
+                  onError={(e) => {
+                    // fallback to initial if the URL is broken
+                    e.currentTarget.style.display = 'none';
+                  }}
+                />
+              ) : (
+                <div className="avatar">{user.full_name.charAt(0).toUpperCase()}</div>
+              )}
               <div className="user-info">
                 <span className="user-name">{user.full_name}</span>
                 <span className="user-role">

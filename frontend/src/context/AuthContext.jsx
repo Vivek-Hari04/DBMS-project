@@ -82,6 +82,14 @@ export const AuthProvider = ({ children }) => {
     localStorage.removeItem('user');
   };
 
+  const updateUser = (patch) => {
+    setUser((prev) => {
+      const next = { ...(prev || {}), ...(patch || {}) };
+      localStorage.setItem('user', JSON.stringify(next));
+      return next;
+    });
+  };
+
   const value = {
     user,
     token,
@@ -90,13 +98,14 @@ export const AuthProvider = ({ children }) => {
     recover,
     register,
     logout,
+    updateUser,
     isAuthenticated: !!token,
     isHandyman:    user?.user_type === 'handyman',
     isCustomer:    user?.user_type === 'customer',
     isShopkeeper:  user?.user_type === 'shopkeeper',
     // Legacy aliases kept for backward-compat with App.jsx nav guards
     isWorker:      user?.user_type === 'handyman',
-    isEmployer:    user?.user_type === 'shopkeeper',
+    isEmployer:    user?.user_type === 'customer' || user?.user_type === 'shopkeeper',
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
