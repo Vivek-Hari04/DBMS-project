@@ -107,6 +107,8 @@ function JobList() {
       
       setTimeout(() => {
         closeJobDetails();
+        fetchWorkerApps(); // To update the "Already Applied" status
+        fetchJobs({ q: searchTerm, location: locationTerm }); // To refresh job list state
       }, 2000);
     } catch (err) {
       setApplicationMessage({ 

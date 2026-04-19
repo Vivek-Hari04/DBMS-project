@@ -11,6 +11,7 @@ function Profile({ userId }) {
     phone: '',
     location: '',
     bio: '',
+    specification: '',
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -28,6 +29,7 @@ function Profile({ userId }) {
         phone: response.data.phone || '',
         location: response.data.location || '',
         bio: response.data.bio || '',
+        specification: response.data.specification || '',
       });
       setLoading(false);
     } catch (err) {
@@ -80,6 +82,11 @@ function Profile({ userId }) {
           <div className="profile-field">
             <strong>Location:</strong> {profile.location || 'Not provided'}
           </div>
+          {profile.user_type === 'handyman' && (
+            <div className="profile-field">
+              <strong>Specification:</strong> {profile.specification || 'worker'}
+            </div>
+          )}
           <div className="profile-field">
             <strong>Bio:</strong> {profile.bio || 'No bio yet'}
           </div>
@@ -121,6 +128,19 @@ function Profile({ userId }) {
               onChange={handleChange}
             />
           </div>
+
+          {profile.user_type === 'handyman' && (
+            <div className="form-group">
+              <label>Specification:</label>
+              <input
+                type="text"
+                name="specification"
+                value={formData.specification}
+                onChange={handleChange}
+                placeholder="e.g. Plumber, Electrician"
+              />
+            </div>
+          )}
 
           <div className="form-group">
             <label>Bio:</label>

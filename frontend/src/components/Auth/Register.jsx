@@ -14,6 +14,7 @@ const INITIAL_FORM = {
   phone: '',
   location: '',
   avatar_url: '',
+  specification: '',
 };
 
 function Register() {
@@ -210,6 +211,21 @@ function Register() {
             </div>
             {errors.user_type && <p className="field-error">{errors.user_type}</p>}
           </div>
+
+          {formData.user_type === 'handyman' && (
+            <div className="field-group">
+              <label htmlFor="reg-specification" className="field-label">Worker Specification</label>
+              <input
+                id="reg-specification"
+                type="text"
+                name="specification"
+                value={formData.specification}
+                onChange={handleChange}
+                placeholder="e.g. Plumber, Electrician (default: worker)"
+                className="field-input"
+              />
+            </div>
+          )}
 
           {/* Phone (optional) */}
           <div className="field-group">

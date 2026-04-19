@@ -60,6 +60,7 @@ export const jobAPI = {
   createPrivateOffer: (offerData) => api.post('/jobs/offers', offerData),
   getJobOffers: () => api.get('/jobs/offers'),
   respondToOffer: (jobId, action) => api.put(`/jobs/${jobId}/offer-response`, { action }),
+  getCategories: () => api.get('/categories'),
 };
 
 export const ratingAPI = {

@@ -22,6 +22,7 @@ type RegisterRequest struct {
     Phone    string `json:"phone"`
     Location string `json:"location"`
     AvatarURL string `json:"avatar_url"`
+    Specification string `json:"specification"`
 }
 
 func (h *AuthHandler) Register(c *gin.Context) {
@@ -40,8 +41,8 @@ func (h *AuthHandler) Register(c *gin.Context) {
 
     // Insert user into database
     query := `
-        INSERT INTO users (email, password_hash, full_name, user_type, phone, location, avatar_url)
-        VALUES ($1, $2, $3, $4, $5, $6, $7)
+        INSERT INTO users (email, password_hash, full_name, user_type, phone, location, avatar_url, specification)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, COALESCE(NULLIF($8, ''), 'worker'))
         RETURNING id, email, full_name, user_type, avatar_url, created_at
     `
     
@@ -55,7 +56,7 @@ func (h *AuthHandler) Register(c *gin.Context) {
     }
 
     err = h.DB.QueryRow(context.Background(), query, 
-        req.Email, string(hashedPassword), req.FullName, req.UserType, req.Phone, req.Location, req.AvatarURL,
+        req.Email, string(hashedPassword), req.FullName, req.UserType, req.Phone, req.Location, req.AvatarURL, req.Specification,
     ).Scan(&user.ID, &user.Email, &user.FullName, &user.UserType, &user.AvatarURL, &user.CreatedAt)
 
     if err != nil {

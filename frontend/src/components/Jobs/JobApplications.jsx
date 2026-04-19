@@ -56,7 +56,7 @@ function JobApplications({ jobId, onBack }) {
     try {
       await jobAPI.hireWorker(jobId, workerId);
       toast.success('Worker hired successfully');
-      fetchJobAndApplications();
+      fetchJobAndApplications(); // soft refresh by re-fetching data
     } catch (err) {
       toast.error(err.response?.data?.error || 'Failed to hire worker');
     }

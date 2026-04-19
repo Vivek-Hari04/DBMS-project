@@ -20,6 +20,7 @@ function ProfilePage() {
     location: '',
     bio: '',
     avatar_url: '',
+    specification: '',
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -44,6 +45,7 @@ function ProfilePage() {
         location: data.location || '',
         bio: data.bio || '',
         avatar_url: data.avatar_url || '',
+        specification: data.specification || '',
       });
     } catch (err) {
       setError('Failed to load profile. Please try again later.');
@@ -179,6 +181,12 @@ function ProfilePage() {
                 <span className="field-label">Location</span>
                 <span className="field-value">{profile?.location || 'Not provided'}</span>
               </div>
+              {(profile?.user_type === 'handyman' || profile?.role === 'handyman' || user?.user_type === 'handyman' || user?.role === 'handyman') && (
+                <div className="profile-field">
+                  <span className="field-label">Specification</span>
+                  <span className="field-value">{profile?.specification || 'worker'}</span>
+                </div>
+              )}
               <div className="profile-field">
                 <span className="field-label">Member Since</span>
                 <span className="field-value">
@@ -256,6 +264,20 @@ function ProfilePage() {
                   />
                 </div>
               </div>
+
+              {(profile?.user_type === 'handyman' || profile?.role === 'handyman' || user?.user_type === 'handyman' || user?.role === 'handyman') && (
+                <div className="form-group">
+                  <label className="form-label">Specification</label>
+                  <input
+                    type="text"
+                    name="specification"
+                    value={formData.specification}
+                    onChange={handleChange}
+                    className="form-input"
+                    placeholder="e.g. Plumber, Electrician"
+                  />
+                </div>
+              )}
             </div>
 
             <div className="form-group bio-group">

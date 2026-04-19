@@ -16,7 +16,7 @@ function CreateJob() {
     salary_min: '',
     salary_max: '',
     duration: '',
-    category_id: 1, // Defaulting for now
+    category_id: 11, // General Labourer ID
     contact_phone: '',
     contact_email: '',
     expiry_days: 7, // Default to 7 days (backend allows max 7)
@@ -26,6 +26,7 @@ function CreateJob() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [useProfileLocation, setUseProfileLocation] = useState(false);
+  const [categories, setCategories] = useState([]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -51,7 +52,21 @@ function CreateJob() {
         // silent; user can still fill manually
       }
     };
+    const fetchCats = async () => {
+      try {
+        const res = await jobAPI.getCategories();
+        setCategories(res.data.categories || []);
+        if (res.data.categories && res.data.categories.length > 0) {
+          const general = res.data.categories.find(c => c.name.toLowerCase().includes('general'));
+          if (general) {
+            setFormData(prev => ({ ...prev, category_id: general.id }));
+          }
+        }
+      } catch (e) {
+      }
+    };
     run();
+    fetchCats();
   }, [useProfileLocation, user?.id]);
 
   const handleSubmit = async (e) => {
@@ -144,6 +159,23 @@ function CreateJob() {
               className="form-input w-full"
               placeholder="e.g. 2 hours, 1 day"
             />
+          </div>
+
+          <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+            <label className="form-label">Category</label>
+            <div className="select-wrapper">
+              <select
+                name="category_id"
+                value={formData.category_id}
+                onChange={handleChange}
+                className="field-select"
+              >
+                {categories.map((c) => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </select>
+              <span className="select-chevron">▾</span>
+            </div>
           </div>
 
           <div className="form-group">

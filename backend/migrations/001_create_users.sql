@@ -11,5 +11,5 @@ CREATE TABLE users (
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   deleted_at TIMESTAMP NULL
 );
-
+ALTER TABLE users ADD COLUMN specification VARCHAR(255) DEFAULT 'worker';
 CREATE INDEX idx_users_email ON users(email);

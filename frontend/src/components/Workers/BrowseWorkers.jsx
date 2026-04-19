@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
-import { favoritesAPI, jobAPI, workersAPI } from '../../services/api';
+import { favoritesAPI, jobAPI, workersAPI, profileAPI } from '../../services/api';
 import toast from 'react-hot-toast';
 import './BrowseWorkers.css';
 import StructuredLocationField from '../Location/StructuredLocationField';
+import { useAuth } from '../../context/AuthContext';
 
 function WorkerCard({ worker, isFavorite, onToggleFavorite, onOfferJob }) {
   return (
@@ -37,7 +38,10 @@ function WorkerCard({ worker, isFavorite, onToggleFavorite, onOfferJob }) {
 
         <div style={{ flex: 1 }}>
           <div style={{ fontWeight: 700 }}>{worker.full_name}</div>
-          <div style={{ fontSize: 13, color: '#6b7280' }}>{worker.location || 'Location not provided'}</div>
+          <div style={{ fontSize: 13, color: '#6b7280' }}>
+            {worker.location || 'Location not provided'}
+            {worker.specification && ` • ${worker.specification}`}
+          </div>
           <div style={{ fontSize: 13, color: '#6b7280', marginTop: 4 }}>
             {worker.average_rating > 0 ? `★ ${Number(worker.average_rating).toFixed(1)}/5.0` : 'No ratings yet'}
           </div>
@@ -59,10 +63,12 @@ function WorkerCard({ worker, isFavorite, onToggleFavorite, onOfferJob }) {
 }
 
 function BrowseWorkers() {
+  const { user } = useAuth();
   const [tab, setTab] = useState('all'); // all | favorites
   const [loading, setLoading] = useState(true);
   const [locationTerm, setLocationTerm] = useState('');
   const [nameTerm, setNameTerm] = useState('');
+  const [specTerm, setSpecTerm] = useState('');
   const [workers, setWorkers] = useState([]);
   const [favorites, setFavorites] = useState([]);
   const [offerModal, setOfferModal] = useState({ show: false, worker: null });
@@ -75,12 +81,14 @@ function BrowseWorkers() {
     salary_min: '',
     salary_max: '',
     duration: '',
-    category_id: 1,
+    category_id: 11,
     contact_phone: '',
     contact_email: '',
     expiry_days: 7,
   });
   const [offerSubmitting, setOfferSubmitting] = useState(false);
+  const [useProfileLocation, setUseProfileLocation] = useState(false);
+  const [categories, setCategories] = useState([]);
 
   const favoriteSet = useMemo(() => new Set(favorites.map((w) => w.id)), [favorites]);
 
@@ -88,7 +96,7 @@ function BrowseWorkers() {
     setLoading(true);
     try {
       const [wRes, fRes] = await Promise.all([
-        workersAPI.listWorkers({ location: locationTerm || '', name: nameTerm || '' }),
+        workersAPI.listWorkers({ location: locationTerm || '', name: nameTerm || '', specification: specTerm || '' }),
         favoritesAPI.listFavoriteWorkers(),
       ]);
       setWorkers(wRes.data.workers || []);
@@ -108,8 +116,28 @@ function BrowseWorkers() {
 
   useEffect(() => {
     fetchAll();
+    jobAPI.getCategories().then(res => {
+      const cats = res.data.categories || [];
+      setCategories(cats);
+      const general = cats.find(c => c.name.toLowerCase().includes('general'));
+      if (general) {
+        setOfferForm(prev => ({ ...prev, category_id: general.id }));
+      }
+    }).catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    const run = async () => {
+      if (useProfileLocation && user?.id) {
+        try {
+          const response = await profileAPI.getProfile(user.id);
+          setOfferForm((prev) => ({ ...prev, location: response.data.location || '' }));
+        } catch (err) {}
+      }
+    };
+    run();
+  }, [useProfileLocation, user?.id]);
 
   const toggleFavorite = async (workerId, currentlyFav) => {
     try {
@@ -136,8 +164,9 @@ function BrowseWorkers() {
       title: '',
       description: '',
       requirements: '',
-      location: worker.location || '',
+      location: '',
     }));
+    setUseProfileLocation(false);
     setOfferModal({ show: true, worker });
   };
 
@@ -175,7 +204,15 @@ function BrowseWorkers() {
           />
           <input
             type="text"
-            placeholder="Search workers by location (state/district/pin)..."
+            placeholder="Search by worker specification (e.g. Plumber)..."
+            value={specTerm}
+            onChange={(e) => setSpecTerm(e.target.value)}
+            onKeyDown={handleKeyDown}
+            className="form-input"
+          />
+          <input
+            type="text"
+            placeholder="Search workers by location..."
             value={locationTerm}
             onChange={(e) => setLocationTerm(e.target.value)}
             onKeyDown={handleKeyDown}
@@ -259,12 +296,40 @@ function BrowseWorkers() {
                 />
               </div>
 
-              <StructuredLocationField
-                value={offerForm.location}
-                onChange={(locStr) => setOfferForm((p) => ({ ...p, location: locStr }))}
-                required
-                label="Job Location"
-              />
+              <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                  <label className="form-label" style={{ margin: 0 }}>Job Location</label>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#374151' }}>
+                    <input
+                      type="checkbox"
+                      checked={useProfileLocation}
+                      onChange={(e) => setUseProfileLocation(e.target.checked)}
+                    />
+                    Use my profile location
+                  </label>
+                </div>
+                <StructuredLocationField
+                  value={offerForm.location}
+                  onChange={(locStr) => setOfferForm((p) => ({ ...p, location: locStr }))}
+                  required
+                />
+              </div>
+
+              <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+                <label className="form-label">Category</label>
+                <div className="select-wrapper">
+                  <select
+                    className="form-input w-full"
+                    value={offerForm.category_id}
+                    onChange={(e) => setOfferForm((p) => ({ ...p, category_id: e.target.value }))}
+                    required
+                  >
+                    {categories.map(c => (
+                      <option key={c.id} value={c.id}>{c.name}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
 
               <div className="form-group">
                 <label className="form-label">Min Salary (₹)</label>

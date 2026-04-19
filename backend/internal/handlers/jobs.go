@@ -836,7 +836,32 @@ func (h *JobHandler) RespondToOffer(c *gin.Context) {
         VALUES ($1, 'offer_accepted', 'Offer Accepted', 'Your private job offer was accepted.')
     `, employerID)
 
-    c.JSON(http.StatusOK, gin.H{"message": "Offer accepted"})
+    c.JSON(http.StatusOK, gin.H{"message": "Offer status updated"})
+}
+
+// Get all categories
+func (h *JobHandler) GetCategories(c *gin.Context) {
+    query := `SELECT id, name, description FROM categories ORDER BY id ASC`
+    rows, err := h.DB.Query(context.Background(), query)
+    if err != nil {
+        c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch categories"})
+        return
+    }
+    defer rows.Close()
+
+    var categories []map[string]interface{}
+    for rows.Next() {
+        var id int
+        var name, description sql.NullString
+        if err := rows.Scan(&id, &name, &description); err != nil {
+            continue
+        }
+        category := map[string]interface{}{"id": id}
+        if name.Valid { category["name"] = name.String }
+        if description.Valid { category["description"] = description.String }
+        categories = append(categories, category)
+    }
+    c.JSON(http.StatusOK, gin.H{"categories": categories})
 }
 
 // DeleteJob endpoint

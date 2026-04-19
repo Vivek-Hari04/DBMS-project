@@ -76,6 +76,7 @@ func main() {
     router.GET("/api/jobs", jobHandler.GetJobs)              // Anyone can view jobs
     router.GET("/api/jobs/search", jobHandler.SearchJobs)    // Anyone can search jobs
     router.GET("/api/jobs/:id", jobHandler.GetJob)           // Anyone can view job details
+    router.GET("/api/categories", jobHandler.GetCategories)  // Anyone can view categories
 
     // Protected routes (authentication required)
     protected := router.Group("/api")

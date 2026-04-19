@@ -21,9 +21,10 @@ type WorkersHandler struct {
 func (h *WorkersHandler) ListWorkers(c *gin.Context) {
 	locationQ := strings.TrimSpace(c.Query("location"))
 	nameQ := strings.TrimSpace(c.Query("name"))
+	specQ := strings.TrimSpace(c.Query("specification"))
 
 	query := `
-		SELECT u.id, u.full_name, u.avatar_url, u.location,
+		SELECT u.id, u.full_name, u.avatar_url, u.location, u.specification,
 		       COALESCE((SELECT AVG(rating) FROM ratings r WHERE r.reviewee_id = u.id), 0) as average_rating
 		FROM users u
 		WHERE u.user_type = 'handyman'
@@ -44,6 +45,12 @@ func (h *WorkersHandler) ListWorkers(c *gin.Context) {
 		argCount++
 	}
 
+	if specQ != "" {
+		query += ` AND u.specification ILIKE $` + strconv.Itoa(argCount)
+		args = append(args, "%"+specQ+"%")
+		argCount++
+	}
+
 	query += ` ORDER BY u.full_name ASC`
 
 	rows, err := h.DB.Query(context.Background(), query, args...)
@@ -60,10 +67,11 @@ func (h *WorkersHandler) ListWorkers(c *gin.Context) {
 			fullName string
 			avatarURL sql.NullString
 			location sql.NullString
+			specification sql.NullString
 			avgRating float64
 		)
 
-		if err := rows.Scan(&id, &fullName, &avatarURL, &location, &avgRating); err != nil {
+		if err := rows.Scan(&id, &fullName, &avatarURL, &location, &specification, &avgRating); err != nil {
 			continue
 		}
 
@@ -77,6 +85,9 @@ func (h *WorkersHandler) ListWorkers(c *gin.Context) {
 		}
 		if location.Valid {
 			w["location"] = location.String
+		}
+		if specification.Valid {
+			w["specification"] = specification.String
 		}
 		workers = append(workers, w)
 	}
