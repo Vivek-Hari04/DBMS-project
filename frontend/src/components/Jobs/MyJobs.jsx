@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { jobAPI } from '../../services/api';
+import { jobAPI, ratingAPI, profileAPI } from '../../services/api';
+import toast from 'react-hot-toast';
 import JobApplications from './JobApplications';
 import './Jobs.css';
 import './TableUtilities.css';
@@ -11,6 +12,9 @@ function MyJobs() {
   
   // State to manage which job's applications are being viewed
   const [selectedJobId, setSelectedJobId] = useState(null);
+  
+  const [ratingModal, setRatingModal] = useState({ show: false, jobId: null, revieweeId: null, rating: 5, review: '' });
+  const [contactModal, setContactModal] = useState({ show: false, loading: false, profile: null });
 
   useEffect(() => {
     fetchMyJobs();
@@ -19,27 +23,50 @@ function MyJobs() {
   const fetchMyJobs = async () => {
     try {
       setLoading(true);
-      const response = await jobAPI.getAllJobs(); // Actually, the backend should have a getMyJobs, but currently it returns all, we filter on client
-      
-      // We'll filter all jobs based on current user via api or token, 
-      // Assuming the API returns only jobs that belong to the user if the backend implements it,
-      // OR let's filter if it doesn't.
-      // Wait, there's no endpoint, so we use getAllJobs and hope it returns the user's jobs or we filter.
-      // Actually, since MyJobs was using standard logic earlier, let's keep it doing standard.
-      // In the previous version, MyJobs fetched all jobs and relied on the backend, or we filter.
-      
-      const userStr = localStorage.getItem('user');
-      const user = userStr ? JSON.parse(userStr) : null;
-      
-      let allJobs = response.data.jobs || [];
-      if (user) {
-        allJobs = allJobs.filter(j => j.employer_id === user.id);
-      }
-      setJobs(allJobs);
+      const response = await jobAPI.getMyJobs();
+      setJobs(response.data.jobs || []);
     } catch (err) {
       setError('Failed to load your jobs');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDeleteJob = async (jobId) => {
+    if (!window.confirm('Are you sure you want to delete this job?')) return;
+    try {
+      await jobAPI.deleteJob(jobId);
+      setJobs(jobs.filter(j => j.id !== jobId));
+      toast.success('Job deleted successfully');
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed to delete job');
+    }
+  };
+
+  const submitRating = async () => {
+    try {
+      await ratingAPI.createRating({
+        job_id: ratingModal.jobId,
+        reviewee_id: ratingModal.revieweeId,
+        rating: ratingModal.rating,
+        review: ratingModal.review
+      });
+      toast.success('Rating submitted!');
+      setRatingModal({ show: false, jobId: null, revieweeId: null, rating: 5, review: '' });
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed to submit rating');
+    }
+  };
+
+  const openContact = async (workerId) => {
+    setContactModal({ show: true, loading: true, profile: null });
+    try {
+      const res = await profileAPI.getProfile(workerId);
+      const data = res.data.profile || res.data;
+      setContactModal({ show: true, loading: false, profile: data });
+    } catch (e) {
+      toast.error('Failed to load worker profile');
+      setContactModal({ show: false, loading: false, profile: null });
     }
   };
 
@@ -86,20 +113,205 @@ function MyJobs() {
                   </td>
                   <td className="text-gray-500">{job.location}</td>
                   <td className="text-gray-500">
-                    {new Date(job.expires_at).toLocaleDateString()}
+                    <span className={`badge ${job.status === 'open' ? 'badge-primary' : 'badge-success'}`}>
+                      {job.status}
+                    </span>
                   </td>
                   <td>
+                    {job.status === 'open' && (
+                      <button 
+                        onClick={() => setSelectedJobId(job.id)} 
+                        className="btn btn-secondary text-sm mr-2"
+                      >
+                        View Applications
+                      </button>
+                    )}
+                    {job.status === 'closed' && (
+                      <button 
+                        onClick={() => {
+                          setSelectedJobId(job.id)
+                        }} 
+                        className="btn btn-primary text-sm mr-2"
+                      >
+                        View Details
+                      </button>
+                    )}
+                    {job.status === 'closed' && job.hired_worker_id && (
+                      <button
+                        onClick={() =>
+                          setRatingModal({
+                            show: true,
+                            jobId: job.id,
+                            revieweeId: job.hired_worker_id,
+                            rating: 5,
+                            review: '',
+                          })
+                        }
+                        className="btn btn-secondary text-sm mr-2"
+                      >
+                        Rate Worker
+                      </button>
+                    )}
+                    {job.status === 'closed' && job.hired_worker_id && (
+                      <button
+                        onClick={() => openContact(job.hired_worker_id)}
+                        className="btn btn-secondary text-sm mr-2"
+                      >
+                        View Contact
+                      </button>
+                    )}
                     <button 
-                      onClick={() => setSelectedJobId(job.id)} 
-                      className="btn btn-secondary text-sm"
+                      onClick={() => handleDeleteJob(job.id)}
+                      className="btn btn-danger text-sm"
+                      style={{ background: '#ef4444', color: 'white', border: 'none', padding: '0.4rem 0.8rem', borderRadius: '4px', cursor: 'pointer' }}
                     >
-                      View Applications
+                      Delete
                     </button>
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {ratingModal.show && (
+        <div
+          className="modal-overlay"
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 50,
+          }}
+          onClick={() => setRatingModal({ show: false, jobId: null, revieweeId: null, rating: 5, review: '' })}
+        >
+          <div
+            className="card"
+            style={{ width: 520, maxWidth: '92vw', padding: '1.25rem' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="section-title" style={{ marginBottom: '0.75rem' }}>Rate Worker</h3>
+            <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+              {[1, 2, 3, 4, 5].map((n) => (
+                <button
+                  key={n}
+                  type="button"
+                  className="btn btn-secondary text-sm"
+                  onClick={() => setRatingModal((m) => ({ ...m, rating: n }))}
+                  style={{
+                    background: ratingModal.rating >= n ? '#2563eb' : undefined,
+                    color: ratingModal.rating >= n ? 'white' : undefined,
+                    border: 'none',
+                  }}
+                >
+                  {n}★
+                </button>
+              ))}
+            </div>
+            <textarea
+              value={ratingModal.review}
+              onChange={(e) => setRatingModal((m) => ({ ...m, review: e.target.value }))}
+              placeholder="Optional review"
+              className="w-full"
+              style={{
+                width: '100%',
+                minHeight: 110,
+                border: '1px solid #e5e7eb',
+                borderRadius: 6,
+                padding: 10,
+                marginBottom: 12,
+              }}
+            />
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+              <button
+                className="btn btn-secondary text-sm"
+                onClick={() => setRatingModal({ show: false, jobId: null, revieweeId: null, rating: 5, review: '' })}
+              >
+                Cancel
+              </button>
+              <button className="btn btn-primary text-sm" onClick={submitRating}>
+                Submit Rating
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {contactModal.show && (
+        <div
+          className="modal-overlay"
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 60,
+          }}
+          onClick={() => setContactModal({ show: false, loading: false, profile: null })}
+        >
+          <div
+            className="card"
+            style={{ width: 520, maxWidth: '92vw', padding: '1.25rem' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="section-title" style={{ marginBottom: '0.75rem' }}>Worker Contact</h3>
+            {contactModal.loading ? (
+              <div className="loading-state">Loading profile...</div>
+            ) : (
+              <>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+                  {contactModal.profile?.avatar_url ? (
+                    <img
+                      src={contactModal.profile.avatar_url}
+                      alt="avatar"
+                      style={{ width: 52, height: 52, borderRadius: '50%', objectFit: 'cover' }}
+                      onError={(e) => (e.currentTarget.style.display = 'none')}
+                    />
+                  ) : (
+                    <div
+                      style={{
+                        width: 52,
+                        height: 52,
+                        borderRadius: '50%',
+                        background: '#eaebef',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontWeight: 700,
+                        color: '#6d7280',
+                      }}
+                    >
+                      {contactModal.profile?.full_name ? contactModal.profile.full_name.charAt(0).toUpperCase() : '?'}
+                    </div>
+                  )}
+                  <div>
+                    <div style={{ fontWeight: 700 }}>{contactModal.profile?.full_name}</div>
+                    <div style={{ color: '#6b7280', fontSize: 13 }}>{contactModal.profile?.location || 'Location not provided'}</div>
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gap: 8 }}>
+                  <div><strong>Email:</strong> {contactModal.profile?.email}</div>
+                  <div><strong>Phone:</strong> {contactModal.profile?.phone || 'Not provided'}</div>
+                </div>
+              </>
+            )}
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 14 }}>
+              <button
+                className="btn btn-secondary text-sm"
+                onClick={() => setContactModal({ show: false, loading: false, profile: null })}
+              >
+                Close
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

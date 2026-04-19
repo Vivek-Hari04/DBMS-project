@@ -23,6 +23,7 @@ type UserProfile struct {
     Location  *string   `json:"location"`  // Use pointer for nullable fields
     Bio       *string   `json:"bio"`       // Use pointer for nullable fields
     AvatarURL *string   `json:"avatar_url"` // Use pointer for nullable fields
+    Specification *string `json:"specification"` // Use pointer for nullable fields
     CreatedAt time.Time `json:"created_at"`
 }
 
@@ -31,13 +32,13 @@ func (h *ProfileHandler) GetProfile(c *gin.Context) {
     userID := c.Param("id")
     
     query := `
-        SELECT id, email, full_name, user_type, phone, location, bio, avatar_url, created_at
+        SELECT id, email, full_name, user_type, phone, location, bio, avatar_url, specification, created_at
         FROM users
         WHERE id = $1
     `
     
     var profile UserProfile
-    var phone, location, bio, avatarURL sql.NullString
+    var phone, location, bio, avatarURL, specification sql.NullString
     
     err := h.DB.QueryRow(context.Background(), query, userID).Scan(
         &profile.ID,
@@ -48,6 +49,7 @@ func (h *ProfileHandler) GetProfile(c *gin.Context) {
         &location,
         &bio,
         &avatarURL,
+        &specification,
         &profile.CreatedAt,
     )
     
@@ -69,6 +71,9 @@ func (h *ProfileHandler) GetProfile(c *gin.Context) {
     if avatarURL.Valid {
         profile.AvatarURL = &avatarURL.String
     }
+    if specification.Valid {
+        profile.Specification = &specification.String
+    }
     
     c.JSON(http.StatusOK, profile)
 }
@@ -82,6 +87,8 @@ func (h *ProfileHandler) UpdateProfile(c *gin.Context) {
         Phone    string `json:"phone"`
         Location string `json:"location"`
         Bio      string `json:"bio"`
+        AvatarURL string `json:"avatar_url"`
+        Specification string `json:"specification"`
     }
     
     if err := c.ShouldBindJSON(&req); err != nil {
@@ -91,16 +98,16 @@ func (h *ProfileHandler) UpdateProfile(c *gin.Context) {
     
     query := `
         UPDATE users
-        SET full_name = $1, phone = $2, location = $3, bio = $4
-        WHERE id = $5
-        RETURNING id, email, full_name, user_type, phone, location, bio, avatar_url, created_at
+        SET full_name = $1, phone = $2, location = $3, bio = $4, avatar_url = $5, specification = $6
+        WHERE id = $7
+        RETURNING id, email, full_name, user_type, phone, location, bio, avatar_url, specification, created_at
     `
     
     var profile UserProfile
-    var phone, location, bio, avatarURL sql.NullString
+    var phone, location, bio, avatarURL, specification sql.NullString
     
     err := h.DB.QueryRow(context.Background(), query,
-        req.FullName, req.Phone, req.Location, req.Bio, userID,
+        req.FullName, req.Phone, req.Location, req.Bio, req.AvatarURL, req.Specification, userID,
     ).Scan(
         &profile.ID,
         &profile.Email,
@@ -110,6 +117,7 @@ func (h *ProfileHandler) UpdateProfile(c *gin.Context) {
         &location,
         &bio,
         &avatarURL,
+        &specification,
         &profile.CreatedAt,
     )
     
@@ -130,6 +138,9 @@ func (h *ProfileHandler) UpdateProfile(c *gin.Context) {
     }
     if avatarURL.Valid {
         profile.AvatarURL = &avatarURL.String
+    }
+    if specification.Valid {
+        profile.Specification = &specification.String
     }
     
     c.JSON(http.StatusOK, gin.H{

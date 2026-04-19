@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { profileAPI } from '../../services/api';
+import toast from 'react-hot-toast';
 import './Profile.css';
 
 function Profile({ userId }) {
@@ -10,6 +11,7 @@ function Profile({ userId }) {
     phone: '',
     location: '',
     bio: '',
+    specification: '',
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -27,6 +29,7 @@ function Profile({ userId }) {
         phone: response.data.phone || '',
         location: response.data.location || '',
         bio: response.data.bio || '',
+        specification: response.data.specification || '',
       });
       setLoading(false);
     } catch (err) {
@@ -48,7 +51,7 @@ function Profile({ userId }) {
       const response = await profileAPI.updateProfile(userId, formData);
       setProfile(response.data.profile);
       setIsEditing(false);
-      alert('Profile updated successfully!');
+      toast.success('Profile updated successfully!');
     } catch (err) {
       setError('Failed to update profile');
     }
@@ -71,7 +74,7 @@ function Profile({ userId }) {
             <strong>Email:</strong> {profile.email}
           </div>
           <div className="profile-field">
-            <strong>User Type:</strong> {profile.user_type}
+            <strong>User Type:</strong> {profile.user_type === 'customer' ? 'employer' : (profile.user_type === 'handyman' ? 'worker' : profile.user_type)}
           </div>
           <div className="profile-field">
             <strong>Phone:</strong> {profile.phone || 'Not provided'}
@@ -79,6 +82,11 @@ function Profile({ userId }) {
           <div className="profile-field">
             <strong>Location:</strong> {profile.location || 'Not provided'}
           </div>
+          {profile.user_type === 'handyman' && (
+            <div className="profile-field">
+              <strong>Specification:</strong> {profile.specification || 'worker'}
+            </div>
+          )}
           <div className="profile-field">
             <strong>Bio:</strong> {profile.bio || 'No bio yet'}
           </div>
@@ -120,6 +128,19 @@ function Profile({ userId }) {
               onChange={handleChange}
             />
           </div>
+
+          {profile.user_type === 'handyman' && (
+            <div className="form-group">
+              <label>Specification:</label>
+              <input
+                type="text"
+                name="specification"
+                value={formData.specification}
+                onChange={handleChange}
+                placeholder="e.g. Plumber, Electrician"
+              />
+            </div>
+          )}
 
           <div className="form-group">
             <label>Bio:</label>

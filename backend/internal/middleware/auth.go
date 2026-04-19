@@ -50,7 +50,7 @@ func AuthRequired() gin.HandlerFunc {
 func EmployerOnly() gin.HandlerFunc {
     return func(c *gin.Context) {
         userType, exists := c.Get("user_type")
-        if !exists || userType != "employer" {
+        if !exists || (userType != "customer" && userType != "shopkeeper") {
             c.JSON(http.StatusForbidden, gin.H{"error": "Only employers can access this resource"})
             c.Abort()
             return
@@ -63,7 +63,7 @@ func EmployerOnly() gin.HandlerFunc {
 func WorkerOnly() gin.HandlerFunc {
     return func(c *gin.Context) {
         userType, exists := c.Get("user_type")
-        if !exists || userType != "worker" {
+        if !exists || userType != "handyman" {
             c.JSON(http.StatusForbidden, gin.H{"error": "Only workers can access this resource"})
             c.Abort()
             return

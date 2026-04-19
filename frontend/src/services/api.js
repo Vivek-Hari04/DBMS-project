@@ -52,7 +52,20 @@ export const profileAPI = {
 export const jobAPI = {
   createJob: (jobData) => api.post('/jobs', jobData),
   getAllJobs: () => api.get('/jobs'),
+  searchJobs: (params) => api.get('/jobs/search', { params }),
   getJob: (jobId) => api.get(`/jobs/${jobId}`),
+  getMyJobs: () => api.get('/jobs/my'),
+  deleteJob: (jobId) => api.delete(`/jobs/${jobId}`),
+  hireWorker: (jobId, workerId) => api.put(`/jobs/${jobId}/hire/${workerId}`),
+  createPrivateOffer: (offerData) => api.post('/jobs/offers', offerData),
+  getJobOffers: () => api.get('/jobs/offers'),
+  respondToOffer: (jobId, action) => api.put(`/jobs/${jobId}/offer-response`, { action }),
+  getCategories: () => api.get('/categories'),
+};
+
+export const ratingAPI = {
+  createRating: (ratingData) => api.post('/ratings', ratingData),
+  getUserRatings: (userId) => api.get(`/ratings/user/${userId}`),
 };
 
 export const applicationAPI = {
@@ -61,6 +74,24 @@ export const applicationAPI = {
   getJobApplications: (jobId) => api.get(`/applications/job/${jobId}`),
   updateApplicationStatus: (applicationId, status) => 
     api.put(`/applications/${applicationId}`, { status }),
+};
+
+export const notificationAPI = {
+  getNotifications: () => api.get('/notifications'),
+  markAsRead: (id) => api.put(`/notifications/${id}/read`),
+  markAllAsRead: () => api.put('/notifications/read-all'),
+  clearAllNotifications: () => api.delete('/notifications/clear-all'),
+  deleteNotification: (id) => api.delete(`/notifications/${id}`)
+};
+
+export const workersAPI = {
+  listWorkers: (params) => api.get('/workers', { params }),
+};
+
+export const favoritesAPI = {
+  listFavoriteWorkers: () => api.get('/favorites/workers'),
+  favoriteWorker: (workerId) => api.post(`/favorites/workers/${workerId}`),
+  unfavoriteWorker: (workerId) => api.delete(`/favorites/workers/${workerId}`),
 };
 
 export default api;

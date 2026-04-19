@@ -1,10 +1,13 @@
-import { useState } from 'react';
-import { jobAPI } from '../../services/api';
+import { useEffect, useState } from 'react';
+import { jobAPI, profileAPI } from '../../services/api';
 import './Jobs.css';
 import { useNavigate } from 'react-router-dom';
+import StructuredLocationField from '../Location/StructuredLocationField';
+import { useAuth } from '../../context/AuthContext';
 
 function CreateJob() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -13,25 +16,58 @@ function CreateJob() {
     salary_min: '',
     salary_max: '',
     duration: '',
-    category_id: 1, // Defaulting for now
+    category_id: 11, // General Labourer ID
     contact_phone: '',
     contact_email: '',
-    expires_in_days: 30, // Default to 30 days
+    expiry_days: 7, // Default to 7 days (backend allows max 7)
   });
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [useProfileLocation, setUseProfileLocation] = useState(false);
+  const [categories, setCategories] = useState([]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({
       ...prev,
-      [name]: ['salary_min', 'salary_max', 'category_id', 'expires_in_days'].includes(name) 
+      [name]: ['salary_min', 'salary_max', 'category_id', 'expiry_days'].includes(name) 
         ? (value ? Number(value) : '') 
         : value,
     }));
   };
+
+  useEffect(() => {
+    const run = async () => {
+      if (!useProfileLocation) return;
+      try {
+        if (!user?.id) return;
+        const res = await profileAPI.getProfile(user.id);
+        const p = res.data.profile || res.data;
+        if (p?.location) {
+          setFormData((prev) => ({ ...prev, location: p.location }));
+        }
+      } catch (e) {
+        // silent; user can still fill manually
+      }
+    };
+    const fetchCats = async () => {
+      try {
+        const res = await jobAPI.getCategories();
+        setCategories(res.data.categories || []);
+        if (res.data.categories && res.data.categories.length > 0) {
+          const general = res.data.categories.find(c => c.name.toLowerCase().includes('general'));
+          if (general) {
+            setFormData(prev => ({ ...prev, category_id: general.id }));
+          }
+        }
+      } catch (e) {
+      }
+    };
+    run();
+    fetchCats();
+  }, [useProfileLocation, user?.id]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -91,16 +127,26 @@ function CreateJob() {
 
           {/* Details */}
           <div className="form-group">
-            <label className="form-label">Location <span className="text-red-500">*</span></label>
-            <input
-              type="text"
-              name="location"
-              value={formData.location}
-              onChange={handleChange}
-              className="form-input w-full"
-              required
-              placeholder="City, Neighborhood"
-            />
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+              <label className="form-label" style={{ margin: 0 }}>
+                Location <span className="text-red-500">*</span>
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#374151' }}>
+                <input
+                  type="checkbox"
+                  checked={useProfileLocation}
+                  onChange={(e) => setUseProfileLocation(e.target.checked)}
+                />
+                Use my profile location
+              </label>
+            </div>
+            <div style={{ marginTop: 10 }}>
+              <StructuredLocationField
+                value={formData.location}
+                onChange={(locStr) => setFormData((prev) => ({ ...prev, location: locStr }))}
+                required
+              />
+            </div>
           </div>
 
           <div className="form-group">
@@ -113,6 +159,23 @@ function CreateJob() {
               className="form-input w-full"
               placeholder="e.g. 2 hours, 1 day"
             />
+          </div>
+
+          <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+            <label className="form-label">Category</label>
+            <div className="select-wrapper">
+              <select
+                name="category_id"
+                value={formData.category_id}
+                onChange={handleChange}
+                className="field-select"
+              >
+                {categories.map((c) => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </select>
+              <span className="select-chevron">▾</span>
+            </div>
           </div>
 
           <div className="form-group">

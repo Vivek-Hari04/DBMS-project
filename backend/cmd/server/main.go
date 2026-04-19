@@ -47,6 +47,10 @@ func main() {
     profileHandler := &handlers.ProfileHandler{DB: database}
     jobHandler := &handlers.JobHandler{DB: database}
     applicationHandler := &handlers.ApplicationHandler{DB: database}
+    notificationHandler := &handlers.NotificationHandler{DB: database}
+    ratingHandler := &handlers.RatingHandler{DB: database}
+    workersHandler := &handlers.WorkersHandler{DB: database}
+    favoritesHandler := &handlers.FavoritesHandler{DB: database}
 
     // Create Gin router
     router := gin.Default()
@@ -70,7 +74,9 @@ func main() {
     router.POST("/api/login", authHandler.Login)
     router.POST("/api/recover-account", authHandler.RecoverAccount) // Add this
     router.GET("/api/jobs", jobHandler.GetJobs)              // Anyone can view jobs
+    router.GET("/api/jobs/search", jobHandler.SearchJobs)    // Anyone can search jobs
     router.GET("/api/jobs/:id", jobHandler.GetJob)           // Anyone can view job details
+    router.GET("/api/categories", jobHandler.GetCategories)  // Anyone can view categories
 
     // Protected routes (authentication required)
     protected := router.Group("/api")
@@ -83,6 +89,14 @@ func main() {
 
         // Job routes (employers only)
         protected.POST("/jobs", middleware.EmployerOnly(), jobHandler.CreateJob)
+        protected.GET("/jobs/my", middleware.EmployerOnly(), jobHandler.GetMyJobs)
+        protected.DELETE("/jobs/:id", middleware.EmployerOnly(), jobHandler.DeleteJob)
+        protected.PUT("/jobs/:id/hire/:workerId", middleware.EmployerOnly(), jobHandler.HireWorker)
+
+        // Private offers
+        protected.POST("/jobs/offers", middleware.EmployerOnly(), jobHandler.CreatePrivateOffer)
+        protected.GET("/jobs/offers", middleware.WorkerOnly(), jobHandler.GetMyOffers)
+        protected.PUT("/jobs/:id/offer-response", middleware.WorkerOnly(), jobHandler.RespondToOffer)
 
         // Application routes (workers only)
         protected.POST("/applications", middleware.WorkerOnly(), applicationHandler.ApplyToJob)
@@ -91,6 +105,25 @@ func main() {
         // Application routes (employers only)
         protected.GET("/applications/job/:jobId", middleware.EmployerOnly(), applicationHandler.GetJobApplications)
         protected.PUT("/applications/:id", middleware.EmployerOnly(), applicationHandler.UpdateApplicationStatus)
+
+        // Notification routes
+        protected.GET("/notifications", notificationHandler.GetUserNotifications)
+        protected.PUT("/notifications/:id/read", notificationHandler.MarkAsRead)
+        protected.PUT("/notifications/read-all", notificationHandler.MarkAllAsRead)
+        protected.DELETE("/notifications/clear-all", notificationHandler.ClearAllNotifications)
+        protected.DELETE("/notifications/:id", notificationHandler.DeleteNotification)
+
+        // Rating routes
+        protected.POST("/ratings", ratingHandler.CreateRating)
+        protected.GET("/ratings/user/:id", ratingHandler.GetUserRatings)
+
+        // Workers browsing (employers only)
+        protected.GET("/workers", middleware.EmployerOnly(), workersHandler.ListWorkers)
+
+        // Favorite workers (employers only)
+        protected.GET("/favorites/workers", middleware.EmployerOnly(), favoritesHandler.ListFavoriteWorkers)
+        protected.POST("/favorites/workers/:workerId", middleware.EmployerOnly(), favoritesHandler.AddFavoriteWorker)
+        protected.DELETE("/favorites/workers/:workerId", middleware.EmployerOnly(), favoritesHandler.RemoveFavoriteWorker)
     }
 
     // Get port from environment or default to 8080
