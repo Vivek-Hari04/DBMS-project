@@ -94,4 +94,17 @@ export const favoritesAPI = {
   unfavoriteWorker: (workerId) => api.delete(`/favorites/workers/${workerId}`),
 };
 
+export const shopAPI = {
+  createShop: (data) => api.post('/shops', data),
+  getMyShops: () => api.get('/shops/my'),
+  getShop: (id) => api.get(`/shops/${id}`),
+  updateShop: (id, data) => api.put(`/shops/${id}`, data),
+  addShopImage: (shopId, data) => api.post(`/shops/${shopId}/images`, data),
+  getShopImages: (shopId) => api.get(`/shops/${shopId}/images`),
+  getShopJobs: (shopId) => api.get(`/shops/${shopId}/jobs`),
+  uploadFile: (formData) => api.post('/upload', formData, { 
+    headers: { 'Content-Type': 'multipart/form-data' } 
+  }),
+};
+
 export default api;

@@ -205,7 +205,7 @@ function Register() {
                 </option>
                 <option value="handyman">Worker</option>
                 <option value="customer">Employer</option>
-                {/* <option value="shopkeeper">Shopkeeper</option> */}
+                <option value="shopkeeper">Shopkeeper</option>
               </select>
               <span className="select-chevron">▾</span>
             </div>

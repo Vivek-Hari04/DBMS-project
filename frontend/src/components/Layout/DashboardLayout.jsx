@@ -2,24 +2,39 @@ import { useState, useEffect, useRef } from 'react';
 import { Navigate, Outlet, Link, useLocation } from 'react-router-dom';
 import { Bell } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { notificationAPI } from '../../services/api';
+import { notificationAPI, shopAPI } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 import './DashboardLayout.css';
 
 function DashboardLayout() {
-  const { user, isAuthenticated, logout, isHandyman, isCustomer, isShopkeeper } = useAuth();
+  const { user, isAuthenticated, logout, isHandyman, isCustomer, isShopkeeper, activeShop, setActiveShop } = useAuth();
   const location = useLocation();
   const [notifications, setNotifications] = useState([]);
   const [showDropdown, setShowDropdown] = useState(false);
+  const [myShops, setMyShops] = useState([]);
   const dropdownRef = useRef(null);
 
   useEffect(() => {
     if (isAuthenticated) {
       loadNotifications();
-      const interval = setInterval(loadNotifications, 30000); // 30s polling
+      const interval = setInterval(loadNotifications, 30000);
       return () => clearInterval(interval);
     }
   }, [isAuthenticated]);
+
+  useEffect(() => {
+    if (isShopkeeper) {
+      shopAPI.getMyShops().then(res => {
+        const shops = res.data.shops || [];
+        setMyShops(shops);
+        // Auto-select first shop if none selected or selected no longer exists
+        if (shops.length > 0 && (!activeShop || !shops.find(s => s.id === activeShop.id))) {
+          setActiveShop(shops[0]);
+        }
+      }).catch(() => {});
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isShopkeeper]);
 
   useEffect(() => {
     const handleClickOutside = (e) => {
@@ -94,6 +109,9 @@ function DashboardLayout() {
       { name: 'Browse Workers', path: '/dashboard/workers', icon: '🧑‍🔧' },
       { name: 'Post a Job', path: '/dashboard/create-job', icon: '➕' }
     );
+    if (isShopkeeper) {
+      navItems.push({ name: 'My Shops', path: '/dashboard/my-shops', icon: '🏪' });
+    }
   }
 
   navItems.push({ name: 'Profile', path: '/dashboard/profile', icon: '👤' });
@@ -127,6 +145,7 @@ function DashboardLayout() {
             <h1 className="page-title">
               {navItems.find((n) => n.path === location.pathname)?.name || 'Dashboard'}
             </h1>
+
           </div>
           <div className="topbar-right">
             

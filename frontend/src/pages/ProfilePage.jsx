@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { profileAPI } from '../services/api';
+import { profileAPI, shopAPI } from '../services/api';
 import toast from 'react-hot-toast';
 import './ProfilePage.css';
 import StructuredLocationField from '../components/Location/StructuredLocationField';
@@ -85,6 +85,23 @@ function ProfilePage() {
       setTimeout(() => setSuccess(''), 3000);
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to update profile');
+    }
+  };
+
+  const handleFileUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append('image', file);
+
+    try {
+      toast.loading('Uploading...', { id: 'upload' });
+      const res = await shopAPI.uploadFile(formData);
+      setFormData(prev => ({ ...prev, avatar_url: res.data.url }));
+      toast.success('Avatar uploaded!', { id: 'upload' });
+    } catch (err) {
+      toast.error('Upload failed', { id: 'upload' });
     }
   };
 
@@ -209,16 +226,31 @@ function ProfilePage() {
         ) : (
           <form onSubmit={handleSubmit} className="profile-form">
             <div className="form-grid">
-              <div className="form-group">
+              <div className="form-group" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 <label className="form-label">Profile Image URL</label>
-                <input
-                  type="url"
-                  name="avatar_url"
-                  value={formData.avatar_url}
-                  onChange={handleChange}
-                  className="form-input"
-                  placeholder="https://example.com/avatar.jpg"
-                />
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <input
+                    type="url"
+                    name="avatar_url"
+                    value={formData.avatar_url}
+                    onChange={handleChange}
+                    className="form-input"
+                    placeholder="https://example.com/avatar.jpg"
+                    style={{ flex: 1 }}
+                  />
+                  <div style={{ position: 'relative' }}>
+                    <button type="button" className="btn btn-secondary text-sm" onClick={() => document.getElementById('avatar-upload').click()}>
+                      Upload
+                    </button>
+                    <input 
+                      id="avatar-upload"
+                      type="file" 
+                      accept="image/*" 
+                      onChange={handleFileUpload} 
+                      style={{ display: 'none' }} 
+                    />
+                  </div>
+                </div>
               </div>
               <div className="form-group">
                 <label className="form-label">Full Name</label>

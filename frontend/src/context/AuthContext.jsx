@@ -7,6 +7,9 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [token, setToken] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [activeShop, setActiveShopState] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('activeShop')) || null; } catch { return null; }
+  });
 
   // Load user from localStorage on mount
   useEffect(() => {
@@ -78,8 +81,16 @@ export const AuthProvider = ({ children }) => {
   const logout = () => {
     setToken(null);
     setUser(null);
+    setActiveShopState(null);
     localStorage.removeItem('token');
     localStorage.removeItem('user');
+    localStorage.removeItem('activeShop');
+  };
+
+  const setActiveShop = (shop) => {
+    setActiveShopState(shop);
+    if (shop) localStorage.setItem('activeShop', JSON.stringify(shop));
+    else localStorage.removeItem('activeShop');
   };
 
   const updateUser = (patch) => {
@@ -99,11 +110,12 @@ export const AuthProvider = ({ children }) => {
     register,
     logout,
     updateUser,
+    activeShop,
+    setActiveShop,
     isAuthenticated: !!token,
     isHandyman:    user?.user_type === 'handyman',
     isCustomer:    user?.user_type === 'customer',
     isShopkeeper:  user?.user_type === 'shopkeeper',
-    // Legacy aliases kept for backward-compat with App.jsx nav guards
     isWorker:      user?.user_type === 'handyman',
     isEmployer:    user?.user_type === 'customer' || user?.user_type === 'shopkeeper',
   };

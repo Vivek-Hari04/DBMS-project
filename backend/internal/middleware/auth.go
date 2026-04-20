@@ -71,3 +71,16 @@ func WorkerOnly() gin.HandlerFunc {
         c.Next()
     }
 }
+
+// Middleware to check if user is a shopkeeper
+func ShopkeeperOnly() gin.HandlerFunc {
+    return func(c *gin.Context) {
+        userType, exists := c.Get("user_type")
+        if !exists || userType != "shopkeeper" {
+            c.JSON(http.StatusForbidden, gin.H{"error": "Only shopkeepers can access this resource"})
+            c.Abort()
+            return
+        }
+        c.Next()
+    }
+}

@@ -1,10 +1,13 @@
-import { useState, useEffect } from 'react';
-import { jobAPI, applicationAPI } from '../../services/api';
+import { useState,useEffect } from 'react';
+import { jobAPI, applicationAPI, ratingAPI } from '../../services/api';
+import toast from 'react-hot-toast';
 import './Jobs.css';
 import { useAuth } from '../../context/AuthContext';
+import { useNavigate } from 'react-router-dom';
 
 function JobList() {
   const { user, isHandyman } = useAuth();
+  const navigate = useNavigate();
   const [jobs, setJobs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -22,6 +25,7 @@ function JobList() {
   const [locationTerm, setLocationTerm] = useState('');
   const [workerApps, setWorkerApps] = useState([]);
   const [offers, setOffers] = useState([]);
+  const [ratingModal, setRatingModal] = useState({ show: false, jobId: null, revieweeId: null, rating: 5, review: '' });
 
   useEffect(() => {
     // initial load (no filters)
@@ -77,6 +81,21 @@ function JobList() {
       await fetchOffers();
     } catch (e) {
       setError(e.response?.data?.error || 'Failed to respond to offer');
+    }
+  };
+
+  const submitRating = async () => {
+    try {
+      await ratingAPI.createRating({
+        job_id: ratingModal.jobId,
+        reviewee_id: ratingModal.revieweeId,
+        rating: ratingModal.rating,
+        review: ratingModal.review,
+      });
+      toast.success('Rating submitted!');
+      setRatingModal({ show: false, jobId: null, revieweeId: null, rating: 5, review: '' });
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Already rated or failed to submit');
     }
   };
 
@@ -216,16 +235,32 @@ function JobList() {
                       </button>
                     </>
                   ) : (
-                    <span 
-                      className={`badge ${job.hired_worker_id === user?.id ? 'badge-primary' : 'badge-secondary'}`} 
-                      style={{ 
-                        color: 'white', 
-                        backgroundColor: job.hired_worker_id === user?.id ? '#10b981' : '#ef4444', 
-                        padding: '4px 8px', 
-                        borderRadius: '4px' 
-                      }}>
-                      {job.hired_worker_id === user?.id ? 'Accepted' : 'Rejected'}
-                    </span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <span 
+                        className={`badge ${job.hired_worker_id === user?.id ? 'badge-primary' : 'badge-secondary'}`} 
+                        style={{ 
+                          color: 'white', 
+                          backgroundColor: job.hired_worker_id === user?.id ? '#10b981' : '#ef4444', 
+                          padding: '4px 8px', 
+                          borderRadius: '4px' 
+                        }}>
+                        {job.hired_worker_id === user?.id ? 'Accepted' : 'Rejected'}
+                      </span>
+                      {job.status === 'closed' && job.hired_worker_id === user?.id && (
+                        <button 
+                          className="btn btn-secondary text-sm"
+                          onClick={() => setRatingModal({
+                            show: true,
+                            jobId: job.id,
+                            revieweeId: job.employer_id,
+                            rating: 5,
+                            review: ''
+                          })}
+                        >
+                          Rate Employer
+                        </button>
+                      )}
+                    </div>
                   )}
                 </div>
               </div>
@@ -242,10 +277,25 @@ function JobList() {
             <div key={job.id} className="job-card card">
               <div className="job-card-header">
                 <h3>{job.title}</h3>
-                {job.category_name && <span className="badge badge-primary">{job.category_name}</span>}
+                <div style={{ display: 'flex', gap: 6 }}>
+                  {job.posted_by?.type === 'shop' && (
+                    <span className="badge" style={{ background: '#7c3aed', color: '#fff' }}>Shop</span>
+                  )}
+                  {job.category_name && <span className="badge badge-primary">{job.category_name}</span>}
+                </div>
               </div>
               <p className="job-employer">
-                Posted by: <strong>{job.employer_name}</strong>
+                Posted by:{' '}
+                {job.posted_by?.type === 'shop' ? (
+                  <strong
+                    style={{ color: '#6d28d9', cursor: 'pointer', textDecoration: 'underline' }}
+                    onClick={() => navigate(`/dashboard/shop/${job.posted_by.shop_id}`)}
+                  >
+                    {job.posted_by.name}
+                  </strong>
+                ) : (
+                  <strong>{job.employer_name}</strong>
+                )}
                 <span style={{ fontSize: '0.85em', color: '#666', marginLeft: '8px' }}>
                   {job.average_rating > 0 ? `★ ${Number(job.average_rating).toFixed(1)}/5.0` : '(No ratings yet)'}
                 </span>
@@ -291,7 +341,13 @@ function JobList() {
                 <div className="detail-item">
                   <span className="detail-label">Employer</span>
                   <span>
-                    {selectedJob.employer_name}
+                    {selectedJob.posted_by?.type === 'shop' ? (
+                      <strong style={{ color: '#6d28d9', cursor: 'pointer', textDecoration: 'underline' }} onClick={() => navigate(`/dashboard/shop/${selectedJob.posted_by.shop_id}`)}>
+                        {selectedJob.posted_by.name} (Shop)
+                      </strong>
+                    ) : (
+                      selectedJob.employer_name
+                    )}
                     <span style={{ fontSize: '0.85em', color: '#666', marginLeft: '8px' }}>
                       {selectedJob.average_rating > 0 ? `★ ${Number(selectedJob.average_rating).toFixed(1)}` : '(No ratings)'}
                     </span>
@@ -317,7 +373,26 @@ function JobList() {
                   <span className="detail-label">Expires</span>
                   <span>{new Date(selectedJob.expires_at).toLocaleDateString()}</span>
                 </div>
+                {selectedJob.posted_by?.type === 'shop' && (
+                  <>
+                    <div className="detail-item">
+                      <span className="detail-label">Shop Category</span>
+                      <span>{selectedJob.posted_by.category || 'N/A'}</span>
+                    </div>
+                    <div className="detail-item">
+                      <span className="detail-label">Shop Location</span>
+                      <span>{selectedJob.posted_by.location || 'N/A'}</span>
+                    </div>
+                  </>
+                )}
               </div>
+
+              {selectedJob.posted_by?.type === 'shop' && selectedJob.posted_by.description && (
+                <div className="detail-section" style={{ background: '#f5f3ff', padding: '12px', borderRadius: '8px', border: '1px solid #ddd6fe' }}>
+                  <h4 style={{ color: '#5b21b6' }}>About the Shop</h4>
+                  <p style={{ fontSize: '0.9em', color: '#4c1d95' }}>{selectedJob.posted_by.description}</p>
+                </div>
+              )}
 
               <div className="detail-section">
                 <h4>Description</h4>
@@ -375,6 +450,54 @@ function JobList() {
               ) : (
                 <div className="read-only-msg">Login as a Worker to apply.</div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {ratingModal.show && (
+        <div className="modal-overlay" style={{ zIndex: 100 }} onClick={() => setRatingModal({ show: false, jobId: null, revieweeId: null, rating: 5, review: '' })}>
+          <div className="modal-content card max-w-md" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>Rate Employer</h2>
+              <button className="btn-close" onClick={() => setRatingModal({ show: false, jobId: null, revieweeId: null, rating: 5, review: '' })}>×</button>
+            </div>
+            <div className="modal-body">
+              <div style={{ display: 'flex', justifyContent: 'center', gap: 12, marginBottom: 20 }}>
+                {[1, 2, 3, 4, 5].map(n => (
+                  <button
+                    key={n}
+                    onClick={() => setRatingModal(prev => ({ ...prev, rating: n }))}
+                    style={{
+                      fontSize: '1.5rem',
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      color: ratingModal.rating >= n ? '#f59e0b' : '#d1d5db'
+                    }}
+                  >
+                    ★
+                  </button>
+                ))}
+              </div>
+              <textarea
+                className="form-textarea w-full"
+                placeholder="Share your experience working with this employer (optional)..."
+                value={ratingModal.review}
+                onChange={e => setRatingModal(prev => ({ ...prev, review: e.target.value }))}
+                rows={4}
+              />
+            </div>
+            <div className="modal-footer" style={{ display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
+              <button 
+                className="btn btn-secondary" 
+                onClick={() => setRatingModal({ show: false, jobId: null, revieweeId: null, rating: 5, review: '' })}
+              >
+                Cancel
+              </button>
+              <button className="btn btn-primary" onClick={submitRating}>
+                Submit Rating
+              </button>
             </div>
           </div>
         </div>
