@@ -27,17 +27,39 @@ function JobList() {
   const [offers, setOffers] = useState([]);
   const [ratingModal, setRatingModal] = useState({ show: false, jobId: null, revieweeId: null, rating: 5, review: '' });
 
-  useEffect(() => {
-    // initial load (no filters)
-    fetchJobs({ q: '', location: '' });
-    if (isHandyman && user) {
-      fetchWorkerApps();
-      fetchOffers();
+  const fetchAllData = async (searchParams = { q: searchTerm, location: locationTerm }) => {
+    setLoading(true);
+    try {
+      const requests = [jobAPI.searchJobs(searchParams)];
+      if (isHandyman && user) {
+        requests.push(applicationAPI.getWorkerApplications(user.id));
+        requests.push(jobAPI.getJobOffers());
+      }
+      
+      const results = await Promise.all(requests);
+      setJobs(results[0].data.jobs || []);
+      
+      if (results[1]) {
+        setWorkerApps(results[1].data.applications || []);
+      }
+      if (results[2]) {
+        setOffers(results[2].data.jobs || []);
+      }
+    } catch (err) {
+      console.error('Fetch all data error:', err);
+      setError('Failed to load job data.');
+    } finally {
+      setLoading(false);
     }
+  };
+
+  useEffect(() => {
+    fetchAllData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isHandyman, user]);
 
   const handleSearch = () => {
-    fetchJobs({ q: searchTerm, location: locationTerm });
+    fetchAllData({ q: searchTerm, location: locationTerm });
   };
 
   const handleKeyDown = (e) => {
@@ -46,39 +68,12 @@ function JobList() {
     }
   };
 
-  const fetchWorkerApps = async () => {
-    try {
-      const res = await applicationAPI.getWorkerApplications(user.id);
-      setWorkerApps(res.data.applications || []);
-    } catch (err) {}
-  };
 
-  const fetchJobs = async ({ q, location }) => {
-    try {
-      setLoading(true);
-      const response = await jobAPI.searchJobs({ q, location });
-      setJobs(response.data.jobs || []);
-    } catch (err) {
-      setError('Failed to load jobs.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchOffers = async () => {
-    try {
-      const res = await jobAPI.getJobOffers();
-      setOffers(res.data.jobs || []);
-    } catch (e) {
-      // ignore; user may not be worker or no offers
-      setOffers([]);
-    }
-  };
 
   const respondOffer = async (jobId, action) => {
     try {
       await jobAPI.respondToOffer(jobId, action);
-      await fetchOffers();
+      await fetchAllData();
     } catch (e) {
       setError(e.response?.data?.error || 'Failed to respond to offer');
     }
@@ -123,12 +118,11 @@ function JobList() {
         cover_letter: coverLetter,
       });
       setApplicationMessage({ type: 'success', text: 'Application submitted successfully!' });
+      fetchAllData(); // Refresh immediately in background
       
       setTimeout(() => {
         closeJobDetails();
-        fetchWorkerApps(); // To update the "Already Applied" status
-        fetchJobs({ q: searchTerm, location: locationTerm }); // To refresh job list state
-      }, 2000);
+      }, 1500);
     } catch (err) {
       setApplicationMessage({ 
         type: 'error', 

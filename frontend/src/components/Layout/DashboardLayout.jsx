@@ -31,9 +31,9 @@ function DashboardLayout() {
         if (shops.length > 0 && (!activeShop || !shops.find(s => s.id === activeShop.id))) {
           setActiveShop(shops[0]);
         }
-      }).catch(() => {});
+      }).catch(() => { });
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isShopkeeper]);
 
   useEffect(() => {
@@ -80,7 +80,7 @@ function DashboardLayout() {
     try {
       await notificationAPI.clearAllNotifications();
       setNotifications([]);
-      toast.success('All sorted');
+      toast.success('All cleared');
       setShowDropdown(false);
     } catch (err) {
       toast.error('Failed to clear notifications');
@@ -98,12 +98,7 @@ function DashboardLayout() {
     { name: 'Dashboard', path: '/dashboard', icon: '📊' },
   ];
 
-  if (isHandyman) {
-    navItems.push(
-      { name: 'Browse Jobs', path: '/dashboard/jobs', icon: '🔍' },
-      { name: 'My Applications', path: '/dashboard/applications', icon: '📝' }
-    );
-  } else if (isCustomer || isShopkeeper) {
+  if (isCustomer || isShopkeeper) {
     navItems.push(
       { name: 'My Jobs', path: '/dashboard/my-jobs', icon: '🗂️' },
       { name: 'Browse Workers', path: '/dashboard/workers', icon: '🧑‍🔧' },
@@ -112,6 +107,12 @@ function DashboardLayout() {
     if (isShopkeeper) {
       navItems.push({ name: 'My Shops', path: '/dashboard/my-shops', icon: '🏪' });
     }
+  } else if (isHandyman) {
+    navItems.push(
+      { name: 'Browse Jobs', path: '/dashboard/jobs', icon: '🔍' },
+      { name: 'My Applications', path: '/dashboard/applications', icon: '📝' },
+      { name: 'Browse Workers', path: '/dashboard/workers', icon: '🧑‍🔧' }
+    );
   }
 
   navItems.push({ name: 'Profile', path: '/dashboard/profile', icon: '👤' });
@@ -148,10 +149,10 @@ function DashboardLayout() {
 
           </div>
           <div className="topbar-right">
-            
+
             {/* Notifications Dropdown */}
             <div className="notifications-wrapper" ref={dropdownRef}>
-              <button 
+              <button
                 className="notification-bell-btn"
                 onClick={() => {
                   const nextShow = !showDropdown;
@@ -174,7 +175,7 @@ function DashboardLayout() {
                   <div className="notifications-header">
                     <h3>Notifications</h3>
                     {notifications.length > 0 && (
-                      <button 
+                      <button
                         onClick={handleClearAll}
                         className="mark-all-read"
                       >
@@ -182,7 +183,7 @@ function DashboardLayout() {
                       </button>
                     )}
                   </div>
-                  
+
                   <div className="notifications-body">
                     {notifications.length === 0 ? (
                       <div className="notification-empty">
@@ -192,8 +193,8 @@ function DashboardLayout() {
                     ) : (
                       <div className="notifications-list">
                         {notifications.map(notification => (
-                          <div 
-                            key={notification.id} 
+                          <div
+                            key={notification.id}
                             onClick={() => handleMarkAsRead(notification.id, notification.is_read)}
                             className={`notification-item ${!notification.is_read ? 'unread' : ''}`}
                           >
@@ -209,8 +210,8 @@ function DashboardLayout() {
                               {notification.message}
                             </p>
                             <div className="notif-time">
-                              {new Date(notification.created_at).toLocaleString(undefined, { 
-                                month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' 
+                              {new Date(notification.created_at).toLocaleString(undefined, {
+                                month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
                               })}
                             </div>
                           </div>

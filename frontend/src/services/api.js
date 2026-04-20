@@ -86,6 +86,11 @@ export const notificationAPI = {
 
 export const workersAPI = {
   listWorkers: (params) => api.get('/workers', { params }),
+  sendHelpRequest: (data) => api.post('/workers/help-requests', data),
+  getReceivedHelpRequests: () => api.get('/workers/help-requests/received'),
+  getSentHelpRequests: () => api.get('/workers/help-requests/sent'),
+  respondHelpRequest: (id, data) => api.put(`/workers/help-requests/${id}/respond`, data),
+  deleteHelpRequest: (id) => api.delete(`/workers/help-requests/${id}`),
 };
 
 export const favoritesAPI = {

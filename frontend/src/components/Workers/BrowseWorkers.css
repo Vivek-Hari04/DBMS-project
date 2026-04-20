@@ -1,4 +1,41 @@
+.badge {
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+.badge-warning { background: #fef3c7; color: #92400e; }
+.badge-success { background: #d1fae5; color: #065f46; }
+.badge-danger { background: #fee2e2; color: #991b1b; }
+
 .worker-card {
-  padding: 14px;
+  padding: 1.25rem;
+  transition: all 0.2s ease;
+  border: 1px solid #e5e7eb;
 }
 
+.worker-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  border-color: #d1d5db;
+}
+
+.search-bar .form-input {
+  flex: 1;
+  min-width: 200px;
+}
+
+.modal-overlay {
+  animation: fadeIn 0.15s ease-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.text-red-500:hover {
+  transform: scale(1.1);
+  transition: transform 0.1s;
+}

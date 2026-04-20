@@ -125,8 +125,18 @@ func main() {
         protected.POST("/ratings", ratingHandler.CreateRating)
         protected.GET("/ratings/user/:id", ratingHandler.GetUserRatings)
 
-        // Workers browsing (employers only)
-        protected.GET("/workers", middleware.EmployerOnly(), workersHandler.ListWorkers)
+        // Workers browsing
+        protected.GET("/workers", workersHandler.ListWorkers)
+        
+        // Help Requests (Worker Only)
+        hr := protected.Group("/workers/help-requests", middleware.WorkerOnly())
+        {
+            hr.POST("", workersHandler.SendHelpRequest)
+            hr.GET("/received", workersHandler.GetReceivedHelpRequests)
+            hr.GET("/sent", workersHandler.GetSentHelpRequests)
+            hr.PUT("/:id/respond", workersHandler.RespondHelpRequest)
+            hr.DELETE("/:id", workersHandler.DeleteHelpRequest)
+        }
 
         // Favorite workers (employers only)
         protected.GET("/favorites/workers", middleware.EmployerOnly(), favoritesHandler.ListFavoriteWorkers)
