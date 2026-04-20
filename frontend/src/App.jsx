@@ -8,6 +8,8 @@ import Login from './components/Auth/Login';
 import Register from './components/Auth/Register';
 import HomePage from './pages/HomePage';
 import ProfilePage from './pages/ProfilePage';
+import MyShopsPage from './pages/MyShopsPage';
+import ShopProfilePage from './pages/ShopProfilePage';
 
 // Job Components
 import JobList from './components/Jobs/JobList';
@@ -54,6 +56,8 @@ function App() {
           <Route path="my-jobs" element={<MyJobs />} />
           <Route path="create-job" element={<CreateJob />} />
           <Route path="applications" element={<MyApplications />} />
+          <Route path="my-shops" element={<MyShopsPage />} />
+          <Route path="shop/:id" element={<ShopProfilePage />} />
         </Route>
 
         {/* Root Redirect */}

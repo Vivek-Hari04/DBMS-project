@@ -5,72 +5,104 @@ import './BrowseWorkers.css';
 import StructuredLocationField from '../Location/StructuredLocationField';
 import { useAuth } from '../../context/AuthContext';
 
-function WorkerCard({ worker, isFavorite, onToggleFavorite, onOfferJob }) {
+function WorkerCard({ worker, isFavorite, onToggleFavorite, onOfferJob, onHelpRequest, isHandyman }) {
+  const [showContact, setShowContact] = useState(false);
+
   return (
     <div className="worker-card card">
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 16 }}>
         {worker.avatar_url ? (
           <img
             src={worker.avatar_url}
             alt="avatar"
-            style={{ width: 44, height: 44, borderRadius: '50%', objectFit: 'cover' }}
-            onError={(e) => {
-              e.currentTarget.style.display = 'none';
-            }}
+            style={{ width: 56, height: 56, borderRadius: '50%', objectFit: 'cover' }}
+            onError={(e) => { e.currentTarget.style.display = 'none'; }}
           />
         ) : (
-          <div
-            style={{
-              width: 44,
-              height: 44,
-              borderRadius: '50%',
-              background: '#eaebef',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontWeight: 700,
-              color: '#6d7280',
-            }}
-          >
+          <div style={{ width: 56, height: 56, borderRadius: '50%', background: '#f3f4f6', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, color: '#9ca3af', fontSize: '1.2rem' }}>
             {worker.full_name ? worker.full_name.charAt(0).toUpperCase() : '?'}
           </div>
         )}
 
         <div style={{ flex: 1 }}>
-          <div style={{ fontWeight: 700 }}>{worker.full_name}</div>
-          <div style={{ fontSize: 13, color: '#6b7280' }}>
-            {worker.location || 'Location not provided'}
-            {worker.specification && ` • ${worker.specification}`}
+          <div style={{ fontSize: '1.1rem', fontWeight: 700, color: '#111827' }}>{worker.full_name}</div>
+          <div style={{ fontSize: 13, color: '#6b7280', marginTop: 2 }}>
+            <span style={{ marginRight: 10 }}>📍 {worker.location || 'N/A'}</span>
+            {worker.specification && <span>🛠️ {worker.specification}</span>}
           </div>
-          <div style={{ fontSize: 13, color: '#6b7280', marginTop: 4 }}>
-            {worker.average_rating > 0 ? `★ ${Number(worker.average_rating).toFixed(1)}/5.0` : 'No ratings yet'}
+          <div style={{ fontSize: 13, color: '#f59e0b', marginTop: 4, fontWeight: 500 }}>
+            {worker.average_rating > 0 ? `★ ${Number(worker.average_rating).toFixed(1)} / 5.0` : 'No ratings yet'}
           </div>
+          
+          {worker.bio && (
+            <p style={{ fontSize: 13, color: '#4b5563', marginTop: 8, fontStyle: 'italic', lineHeight: '1.4' }}>
+              "{worker.bio.substring(0, 100)}{worker.bio.length > 100 ? '...' : ''}"
+            </p>
+          )}
+          
+          {showContact && (
+            <div style={{ marginTop: 12, padding: 10, background: '#f8fafc', borderRadius: 8, fontSize: 13, border: '1px solid #e2e8f0' }}>
+              <div style={{ marginBottom: 4 }}>📧 <strong>Email:</strong> {worker.email || 'Not shared'}</div>
+              <div>📞 <strong>Phone:</strong> {worker.phone || 'Not shared'}</div>
+            </div>
+          )}
         </div>
 
-        <button
-          className={`btn ${isFavorite ? 'btn-primary' : 'btn-secondary'} text-sm`}
-          onClick={() => onToggleFavorite(worker.id, isFavorite)}
-        >
-          {isFavorite ? '★ Favorite' : '☆ Favorite'}
-        </button>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {!isHandyman && (
+            <button
+              className={`btn ${isFavorite ? 'btn-primary' : 'btn-secondary'} text-xs`}
+              style={{ padding: '6px 12px' }}
+              onClick={() => onToggleFavorite(worker.id, isFavorite)}
+            >
+              {isFavorite ? '★ Favored' : '☆ Favorite'}
+            </button>
+          )}
 
-        <button className="btn btn-primary text-sm" onClick={() => onOfferJob(worker)}>
-          Offer Job
-        </button>
+          <button 
+            className="btn btn-secondary text-xs" 
+            style={{ padding: '6px 12px' }}
+            onClick={() => setShowContact(!showContact)}
+          >
+            {showContact ? 'Hide Contact' : 'View Contact'}
+          </button>
+
+          {isHandyman ? (
+            <button 
+              className="btn btn-primary text-xs" 
+              style={{ padding: '6px 12px', background: '#059669' }} 
+              onClick={() => onHelpRequest(worker)}
+            >
+              Ask for Help
+            </button>
+          ) : (
+            <button 
+              className="btn btn-primary text-xs" 
+              style={{ padding: '6px 12px' }} 
+              onClick={() => onOfferJob(worker)}
+            >
+              Offer Job
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );
 }
 
 function BrowseWorkers() {
-  const { user } = useAuth();
-  const [tab, setTab] = useState('all'); // all | favorites
+  const { user, isHandyman } = useAuth();
+  const [tab, setTab] = useState('all'); // all | favorites | received | sent
   const [loading, setLoading] = useState(true);
   const [locationTerm, setLocationTerm] = useState('');
   const [nameTerm, setNameTerm] = useState('');
   const [specTerm, setSpecTerm] = useState('');
   const [workers, setWorkers] = useState([]);
   const [favorites, setFavorites] = useState([]);
+  const [receivedReqs, setReceivedReqs] = useState([]);
+  const [sentReqs, setSentReqs] = useState([]);
+  const [helpModal, setHelpModal] = useState({ show: false, worker: null, message: '' });
+  const [responseModal, setResponseModal] = useState({ show: false, requestId: null, status: '', message: '' });
   const [offerModal, setOfferModal] = useState({ show: false, worker: null });
   const [offerForm, setOfferForm] = useState({
     worker_id: null,
@@ -95,16 +127,58 @@ function BrowseWorkers() {
   const fetchAll = async () => {
     setLoading(true);
     try {
-      const [wRes, fRes] = await Promise.all([
-        workersAPI.listWorkers({ location: locationTerm || '', name: nameTerm || '', specification: specTerm || '' }),
-        favoritesAPI.listFavoriteWorkers(),
-      ]);
-      setWorkers(wRes.data.workers || []);
-      setFavorites(fRes.data.workers || []);
+      const requests = [
+        workersAPI.listWorkers({ location: locationTerm || '', name: nameTerm || '', specification: specTerm || '' })
+      ];
+      
+      const isEmployer = !isHandyman;
+      if (isEmployer) {
+        requests.push(favoritesAPI.listFavoriteWorkers());
+      } else {
+        // Fetch help requests for worker
+        requests.push(workersAPI.getReceivedHelpRequests());
+        requests.push(workersAPI.getSentHelpRequests());
+      }
+
+      const results = await Promise.all(requests);
+      setWorkers(results[0].data.workers || []);
+      
+      if (isEmployer && results[1]) {
+        setFavorites(results[1].data.workers || []);
+      } else if (!isEmployer) {
+        setReceivedReqs(results[1]?.data?.requests || []);
+        setSentReqs(results[2]?.data?.requests || []);
+      }
     } catch (e) {
-      toast.error('Failed to load workers');
+      console.error('Fetch workers error:', e);
+      toast.error('Failed to load data');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleRespond = async () => {
+    try {
+      await workersAPI.respondHelpRequest(responseModal.requestId, {
+        status: responseModal.status,
+        message: responseModal.message
+      });
+      toast.success(`Request ${responseModal.status}`);
+      setResponseModal({ show: false, requestId: null, status: '', message: '' });
+      fetchAll();
+    } catch (e) {
+      toast.error('Failed to respond');
+    }
+  };
+
+  const handleDeleteSent = async (id) => {
+    if (!window.confirm('Delete this help request?')) return;
+    try {
+      await workersAPI.deleteHelpRequest(id);
+      toast.success('Deleted');
+      fetchAll();
+    } catch (e) {
+      toast.error('Delete failed');
     }
   };
 
@@ -189,6 +263,24 @@ function BrowseWorkers() {
     }
   };
 
+  const submitHelpRequest = async () => {
+    if (!helpModal.message.trim()) {
+      toast.error('Please enter a message');
+      return;
+    }
+    try {
+      await workersAPI.sendHelpRequest({
+        worker_id: helpModal.worker.id,
+        message: helpModal.message
+      });
+      toast.success('Help request sent!');
+      setHelpModal({ show: false, worker: null, message: '' });
+      fetchAll();
+    } catch (e) {
+      toast.error('Failed to send help request');
+    }
+  };
+
   return (
     <div className="browse-workers-page">
       <div className="jobs-header">
@@ -224,35 +316,162 @@ function BrowseWorkers() {
         </div>
       </div>
 
-      <div style={{ display: 'flex', gap: 10, marginBottom: 14 }}>
-        <button className={`btn ${tab === 'all' ? 'btn-primary' : 'btn-secondary'} text-sm`} onClick={() => setTab('all')}>
-          All Workers
-        </button>
-        <button
-          className={`btn ${tab === 'favorites' ? 'btn-primary' : 'btn-secondary'} text-sm`}
-          onClick={() => setTab('favorites')}
-        >
-          Favorites
-        </button>
-      </div>
+      {isHandyman ? (
+        <div style={{ display: 'flex', gap: 10, marginBottom: 14 }}>
+          <button className={`btn ${tab === 'all' ? 'btn-primary' : 'btn-secondary'} text-sm`} onClick={() => setTab('all')}>
+            Browse Colleagues
+          </button>
+          <button className={`btn ${tab === 'received' ? 'btn-primary' : 'btn-secondary'} text-sm`} onClick={() => setTab('received')}>
+            Help Requests (Received)
+          </button>
+          <button className={`btn ${tab === 'sent' ? 'btn-primary' : 'btn-secondary'} text-sm`} onClick={() => setTab('sent')}>
+            My Requests (Sent)
+          </button>
+        </div>
+      ) : (
+        <div style={{ display: 'flex', gap: 10, marginBottom: 14 }}>
+          <button className={`btn ${tab === 'all' ? 'btn-primary' : 'btn-secondary'} text-sm`} onClick={() => setTab('all')}>
+            All Workers
+          </button>
+          <button
+            className={`btn ${tab === 'favorites' ? 'btn-primary' : 'btn-secondary'} text-sm`}
+            onClick={() => setTab('favorites')}
+          >
+            Favorites
+          </button>
+        </div>
+      )}
 
       {loading ? (
-        <div className="loading-state">Loading workers...</div>
-      ) : shown.length === 0 ? (
-        <div className="empty-state card">
-          <p>{tab === 'favorites' ? "You haven't favorited any workers yet." : 'No workers found.'}</p>
+        <div className="loading-state">Loading data...</div>
+      ) : tab === 'all' || tab === 'favorites' ? (
+        <>
+          {(tab === 'all' ? workers : favorites).length === 0 ? (
+            <div className="empty-state card">
+              <p>{tab === 'favorites' ? "You haven't favorited any workers yet." : 'No workers found.'}</p>
+            </div>
+          ) : (
+            <div style={{ display: 'grid', gap: 12 }}>
+              {(tab === 'all' ? workers : favorites).map((w) => (
+                <WorkerCard
+                  key={w.id}
+                  worker={w}
+                  isHandyman={isHandyman}
+                  isFavorite={favoriteSet.has(w.id)}
+                  onToggleFavorite={toggleFavorite}
+                  onOfferJob={openOffer}
+                  onHelpRequest={(worker) => setHelpModal({ show: true, worker, message: '' })}
+                />
+              ))}
+            </div>
+          )}
+        </>
+      ) : tab === 'received' ? (
+        <div style={{ display: 'grid', gap: 12 }}>
+          {receivedReqs.length === 0 ? (
+            <div className="empty-state card"><p>No help requests received.</p></div>
+          ) : (
+            receivedReqs.map(req => (
+              <div key={req.id} className="card" style={{ padding: 16 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                  <div style={{ display: 'flex', gap: 12 }}>
+                    <div style={{ width: 40, height: 40, borderRadius: '50%', background: '#eee', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      {req.sender_avatar ? <img src={req.sender_avatar} style={{ width: '100%', height: '100%', borderRadius: '50%' }} /> : req.sender_name.charAt(0)}
+                    </div>
+                    <div>
+                      <div style={{ fontWeight: 600 }}>{req.sender_name}</div>
+                      <div style={{ fontSize: 12, color: '#6b7280' }}>Requested: {new Date(req.created_at).toLocaleDateString()}</div>
+                    </div>
+                  </div>
+                  <span className={`badge badge-${req.status === 'pending' ? 'warning' : (req.status === 'accepted' ? 'success' : 'danger')}`}>
+                    {req.status}
+                  </span>
+                </div>
+                <div style={{ marginTop: 12, padding: 12, background: '#f9fafb', borderRadius: 6, fontSize: 14 }}>
+                  {req.message}
+                </div>
+                {req.response_message && (
+                  <div style={{ marginTop: 12, fontSize: 13, color: '#4b5563' }}>
+                    <strong>Your Response:</strong> {req.response_message}
+                  </div>
+                )}
+                {req.status === 'pending' && (
+                  <div style={{ marginTop: 16, display: 'flex', gap: 8 }}>
+                    <button className="btn btn-primary text-xs" style={{ background: '#059669' }} onClick={() => setResponseModal({ show: true, requestId: req.id, status: 'accepted', message: '' })}>
+                      Accept
+                    </button>
+                    <button className="btn btn-secondary text-xs" onClick={() => setResponseModal({ show: true, requestId: req.id, status: 'rejected', message: '' })}>
+                      Reject
+                    </button>
+                  </div>
+                )}
+              </div>
+            ))
+          )}
         </div>
       ) : (
         <div style={{ display: 'grid', gap: 12 }}>
-          {shown.map((w) => (
-            <WorkerCard
-              key={w.id}
-              worker={w}
-              isFavorite={favoriteSet.has(w.id)}
-              onToggleFavorite={toggleFavorite}
-              onOfferJob={openOffer}
-            />
-          ))}
+          {sentReqs.length === 0 ? (
+            <div className="empty-state card"><p>You haven't sent any help requests.</p></div>
+          ) : (
+            sentReqs.map(req => (
+              <div key={req.id} className="card" style={{ padding: 16 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                  <div style={{ display: 'flex', gap: 12 }}>
+                    <div style={{ width: 40, height: 40, borderRadius: '50%', background: '#eee', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      {req.receiver_avatar ? <img src={req.receiver_avatar} style={{ width: '100%', height: '100%', borderRadius: '50%' }} /> : req.receiver_name.charAt(0)}
+                    </div>
+                    <div>
+                      <div style={{ fontWeight: 600 }}>Sent to: {req.receiver_name}</div>
+                      <div style={{ fontSize: 12, color: '#6b7280' }}>Sent: {new Date(req.created_at).toLocaleDateString()}</div>
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                    <span className={`badge badge-${req.status === 'pending' ? 'warning' : (req.status === 'accepted' ? 'success' : 'danger')}`}>
+                      {req.status}
+                    </span>
+                    <button className="text-red-500 hover:text-red-700" title="Delete request" onClick={() => handleDeleteSent(req.id)}>
+                      🗑️
+                    </button>
+                  </div>
+                </div>
+                <div style={{ marginTop: 12, padding: 12, background: '#f9fafb', borderRadius: 6, fontSize: 14 }}>
+                  {req.message}
+                </div>
+                {req.response_message && (
+                  <div style={{ marginTop: 12, padding: 12, border: '1px solid #e5e7eb', borderRadius: 6, background: '#fff', fontSize: 13 }}>
+                    <div style={{ fontWeight: 600, color: req.status === 'accepted' ? '#059669' : '#dc2626' }}>
+                      Response from {req.receiver_name}:
+                    </div>
+                    <div style={{ marginTop: 4 }}>{req.response_message}</div>
+                  </div>
+                )}
+              </div>
+            ))
+          )}
+        </div>
+      )}
+
+      {responseModal.show && (
+        <div className="modal-overlay" onClick={() => setResponseModal({ show: false, requestId: null, status: '', message: '' })}>
+          <div className="card" style={{ width: 450, maxWidth: '90vw', padding: 20 }} onClick={e => e.stopPropagation()}>
+            <h3 className="section-title">Response to Help Request</h3>
+            <p style={{ marginBottom: 16 }}>You are <strong>{responseModal.status}</strong> this request.</p>
+            <div className="form-group">
+              <label className="form-label">Message (Optional)</label>
+              <textarea 
+                className="form-textarea w-full" 
+                rows={4} 
+                placeholder="Include a helpful message..."
+                value={responseModal.message}
+                onChange={e => setResponseModal(p => ({ ...p, message: e.target.value }))}
+              />
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 16 }}>
+              <button className="btn btn-secondary text-sm" onClick={() => setResponseModal({ show: false, requestId: null, status: '', message: '' })}>Cancel</button>
+              <button className="btn btn-primary text-sm" onClick={handleRespond}>Send Response</button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -262,7 +481,7 @@ function BrowseWorkers() {
           style={{
             position: 'fixed',
             inset: 0,
-            background: 'rgba(0,0,0,0.5)',
+            background: 'rgba(0,0,0,0.4)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -406,6 +625,46 @@ function BrowseWorkers() {
               </button>
               <button className="btn btn-primary text-sm" onClick={submitOffer} disabled={offerSubmitting}>
                 {offerSubmitting ? 'Sending…' : 'Send Offer'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {helpModal.show && (
+        <div
+          className="modal-overlay"
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.4)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 80,
+          }}
+          onClick={() => setHelpModal({ show: false, worker: null, message: '' })}
+        >
+          <div className="card" style={{ width: 500, maxWidth: '92vw', padding: '1.25rem' }} onClick={(e) => e.stopPropagation()}>
+            <h3 className="section-title" style={{ marginBottom: 12 }}>
+              Ask Help from {helpModal.worker?.full_name}
+            </h3>
+            <div className="form-group">
+              <label className="form-label">Message</label>
+              <textarea
+                className="form-textarea w-full"
+                rows={5}
+                placeholder="Explain what kind of help you need..."
+                value={helpModal.message}
+                onChange={(e) => setHelpModal(p => ({ ...p, message: e.target.value }))}
+              />
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 16 }}>
+              <button className="btn btn-secondary text-sm" onClick={() => setHelpModal({ show: false, worker: null, message: '' })}>
+                Cancel
+              </button>
+              <button className="btn btn-primary text-sm" style={{ background: '#059669' }} onClick={submitHelpRequest}>
+                Send Help Request
               </button>
             </div>
           </div>

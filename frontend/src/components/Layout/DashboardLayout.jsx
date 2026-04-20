@@ -2,24 +2,39 @@ import { useState, useEffect, useRef } from 'react';
 import { Navigate, Outlet, Link, useLocation } from 'react-router-dom';
 import { Bell } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { notificationAPI } from '../../services/api';
+import { notificationAPI, shopAPI } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 import './DashboardLayout.css';
 
 function DashboardLayout() {
-  const { user, isAuthenticated, logout, isHandyman, isCustomer, isShopkeeper } = useAuth();
+  const { user, isAuthenticated, logout, isHandyman, isCustomer, isShopkeeper, activeShop, setActiveShop } = useAuth();
   const location = useLocation();
   const [notifications, setNotifications] = useState([]);
   const [showDropdown, setShowDropdown] = useState(false);
+  const [myShops, setMyShops] = useState([]);
   const dropdownRef = useRef(null);
 
   useEffect(() => {
     if (isAuthenticated) {
       loadNotifications();
-      const interval = setInterval(loadNotifications, 30000); // 30s polling
+      const interval = setInterval(loadNotifications, 30000);
       return () => clearInterval(interval);
     }
   }, [isAuthenticated]);
+
+  useEffect(() => {
+    if (isShopkeeper) {
+      shopAPI.getMyShops().then(res => {
+        const shops = res.data.shops || [];
+        setMyShops(shops);
+        // Auto-select first shop if none selected or selected no longer exists
+        if (shops.length > 0 && (!activeShop || !shops.find(s => s.id === activeShop.id))) {
+          setActiveShop(shops[0]);
+        }
+      }).catch(() => { });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isShopkeeper]);
 
   useEffect(() => {
     const handleClickOutside = (e) => {
@@ -65,7 +80,7 @@ function DashboardLayout() {
     try {
       await notificationAPI.clearAllNotifications();
       setNotifications([]);
-      toast.success('All sorted');
+      toast.success('All cleared');
       setShowDropdown(false);
     } catch (err) {
       toast.error('Failed to clear notifications');
@@ -83,16 +98,20 @@ function DashboardLayout() {
     { name: 'Dashboard', path: '/dashboard', icon: '📊' },
   ];
 
-  if (isHandyman) {
-    navItems.push(
-      { name: 'Browse Jobs', path: '/dashboard/jobs', icon: '🔍' },
-      { name: 'My Applications', path: '/dashboard/applications', icon: '📝' }
-    );
-  } else if (isCustomer || isShopkeeper) {
+  if (isCustomer || isShopkeeper) {
     navItems.push(
       { name: 'My Jobs', path: '/dashboard/my-jobs', icon: '🗂️' },
       { name: 'Browse Workers', path: '/dashboard/workers', icon: '🧑‍🔧' },
       { name: 'Post a Job', path: '/dashboard/create-job', icon: '➕' }
+    );
+    if (isShopkeeper) {
+      navItems.push({ name: 'My Shops', path: '/dashboard/my-shops', icon: '🏪' });
+    }
+  } else if (isHandyman) {
+    navItems.push(
+      { name: 'Browse Jobs', path: '/dashboard/jobs', icon: '🔍' },
+      { name: 'My Applications', path: '/dashboard/applications', icon: '📝' },
+      { name: 'Browse Workers', path: '/dashboard/workers', icon: '🧑‍🔧' }
     );
   }
 
@@ -127,12 +146,13 @@ function DashboardLayout() {
             <h1 className="page-title">
               {navItems.find((n) => n.path === location.pathname)?.name || 'Dashboard'}
             </h1>
+
           </div>
           <div className="topbar-right">
-            
+
             {/* Notifications Dropdown */}
             <div className="notifications-wrapper" ref={dropdownRef}>
-              <button 
+              <button
                 className="notification-bell-btn"
                 onClick={() => {
                   const nextShow = !showDropdown;
@@ -155,7 +175,7 @@ function DashboardLayout() {
                   <div className="notifications-header">
                     <h3>Notifications</h3>
                     {notifications.length > 0 && (
-                      <button 
+                      <button
                         onClick={handleClearAll}
                         className="mark-all-read"
                       >
@@ -163,7 +183,7 @@ function DashboardLayout() {
                       </button>
                     )}
                   </div>
-                  
+
                   <div className="notifications-body">
                     {notifications.length === 0 ? (
                       <div className="notification-empty">
@@ -173,8 +193,8 @@ function DashboardLayout() {
                     ) : (
                       <div className="notifications-list">
                         {notifications.map(notification => (
-                          <div 
-                            key={notification.id} 
+                          <div
+                            key={notification.id}
                             onClick={() => handleMarkAsRead(notification.id, notification.is_read)}
                             className={`notification-item ${!notification.is_read ? 'unread' : ''}`}
                           >
@@ -190,8 +210,8 @@ function DashboardLayout() {
                               {notification.message}
                             </p>
                             <div className="notif-time">
-                              {new Date(notification.created_at).toLocaleString(undefined, { 
-                                month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' 
+                              {new Date(notification.created_at).toLocaleString(undefined, {
+                                month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
                               })}
                             </div>
                           </div>

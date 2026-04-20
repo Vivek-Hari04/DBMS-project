@@ -86,12 +86,30 @@ export const notificationAPI = {
 
 export const workersAPI = {
   listWorkers: (params) => api.get('/workers', { params }),
+  sendHelpRequest: (data) => api.post('/workers/help-requests', data),
+  getReceivedHelpRequests: () => api.get('/workers/help-requests/received'),
+  getSentHelpRequests: () => api.get('/workers/help-requests/sent'),
+  respondHelpRequest: (id, data) => api.put(`/workers/help-requests/${id}/respond`, data),
+  deleteHelpRequest: (id) => api.delete(`/workers/help-requests/${id}`),
 };
 
 export const favoritesAPI = {
   listFavoriteWorkers: () => api.get('/favorites/workers'),
   favoriteWorker: (workerId) => api.post(`/favorites/workers/${workerId}`),
   unfavoriteWorker: (workerId) => api.delete(`/favorites/workers/${workerId}`),
+};
+
+export const shopAPI = {
+  createShop: (data) => api.post('/shops', data),
+  getMyShops: () => api.get('/shops/my'),
+  getShop: (id) => api.get(`/shops/${id}`),
+  updateShop: (id, data) => api.put(`/shops/${id}`, data),
+  addShopImage: (shopId, data) => api.post(`/shops/${shopId}/images`, data),
+  getShopImages: (shopId) => api.get(`/shops/${shopId}/images`),
+  getShopJobs: (shopId) => api.get(`/shops/${shopId}/jobs`),
+  uploadFile: (formData) => api.post('/upload', formData, { 
+    headers: { 'Content-Type': 'multipart/form-data' } 
+  }),
 };
 
 export default api;

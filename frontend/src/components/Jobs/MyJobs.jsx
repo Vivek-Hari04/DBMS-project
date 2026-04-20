@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { jobAPI, ratingAPI, profileAPI } from '../../services/api';
+import { useAuth } from '../../context/AuthContext';
+import { shopAPI, jobAPI, ratingAPI, profileAPI } from '../../services/api';
 import toast from 'react-hot-toast';
 import JobApplications from './JobApplications';
 import './Jobs.css';
@@ -9,6 +10,9 @@ function MyJobs() {
   const [jobs, setJobs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [shops, setShops] = useState([]);
+  const [selectedShopId, setSelectedShopId] = useState('all');
+  const { user, isShopkeeper } = useAuth();
   
   // State to manage which job's applications are being viewed
   const [selectedJobId, setSelectedJobId] = useState(null);
@@ -18,7 +22,19 @@ function MyJobs() {
 
   useEffect(() => {
     fetchMyJobs();
+    if (isShopkeeper) {
+      fetchShops();
+    }
   }, []);
+
+  const fetchShops = async () => {
+    try {
+      const res = await shopAPI.getMyShops();
+      setShops(res.data.shops || []);
+    } catch (e) {
+      console.error('Failed to load shops for filter');
+    }
+  };
 
   const fetchMyJobs = async () => {
     try {
@@ -84,8 +100,26 @@ function MyJobs() {
 
   return (
     <div className="my-jobs-dashboard">
-      <div className="jobs-header">
+      <div className="jobs-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <h2 className="section-title">My Posted Jobs</h2>
+        
+        {isShopkeeper && (
+          <div className="shop-filter" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <label htmlFor="shop-select" style={{ fontSize: 14, fontWeight: 500, color: '#666' }}>Filter by Shop:</label>
+            <select 
+              id="shop-select"
+              className="form-select" 
+              value={selectedShopId} 
+              onChange={(e) => setSelectedShopId(e.target.value)}
+              style={{ padding: '6px 12px', fontSize: 14 }}
+            >
+              <option value="all">All Shops</option>
+              {shops.map(s => (
+                <option key={s.id} value={s.id}>{s.name}</option>
+              ))}
+            </select>
+          </div>
+        )}
       </div>
       
       {jobs.length === 0 ? (
@@ -97,21 +131,31 @@ function MyJobs() {
           <table className="w-full text-left border-collapse">
             <thead>
               <tr>
-                <th>Job Title</th>
-                <th>Category</th>
-                <th>Location</th>
-                <th>Expiration</th>
-                <th>Actions</th>
+                 <th>Job Title</th>
+                 <th>Shop</th>
+                 <th>Category</th>
+                 <th>Location</th>
+                 <th>Expiration</th>
+                 <th>Actions</th>
               </tr>
             </thead>
             <tbody>
-              {jobs.map((job) => (
+              {jobs
+                .filter(job => selectedShopId === 'all' || String(job.shop_id) === String(selectedShopId))
+                .map((job) => (
                 <tr key={job.id}>
-                  <td className="font-medium text-gray-900">{job.title}</td>
-                  <td className="text-gray-600">
-                    <span className="badge badge-primary">{job.category_name || 'N/A'}</span>
-                  </td>
-                  <td className="text-gray-500">{job.location}</td>
+                   <td className="font-medium text-gray-900">{job.title}</td>
+                   <td className="text-gray-600">
+                     {job.shop_id ? (
+                       <span style={{ color: '#7c3aed', fontWeight: 600 }}>🏪 {job.shop_name || 'My Shop'}</span>
+                     ) : (
+                       <span className="text-gray-400">Personal</span>
+                     )}
+                   </td>
+                   <td className="text-gray-600">
+                     <span className="badge badge-primary">{job.category_name || 'N/A'}</span>
+                   </td>
+                   <td className="text-gray-500">{job.location}</td>
                   <td className="text-gray-500">
                     <span className={`badge ${job.status === 'open' ? 'badge-primary' : 'badge-success'}`}>
                       {job.status}

@@ -51,6 +51,8 @@ func main() {
     ratingHandler := &handlers.RatingHandler{DB: database}
     workersHandler := &handlers.WorkersHandler{DB: database}
     favoritesHandler := &handlers.FavoritesHandler{DB: database}
+    shopHandler := &handlers.ShopHandler{DB: database}
+    uploadHandler := &handlers.UploadHandler{}
 
     // Create Gin router
     router := gin.Default()
@@ -63,6 +65,9 @@ func main() {
         ExposeHeaders:    []string{"Content-Length"},
         AllowCredentials: true,
     }))
+
+    // Serve static files from uploads directory
+    router.Static("/uploads", "./uploads")
 
     // Health check
     router.GET("/health", func(c *gin.Context) {
@@ -77,6 +82,9 @@ func main() {
     router.GET("/api/jobs/search", jobHandler.SearchJobs)    // Anyone can search jobs
     router.GET("/api/jobs/:id", jobHandler.GetJob)           // Anyone can view job details
     router.GET("/api/categories", jobHandler.GetCategories)  // Anyone can view categories
+    router.GET("/api/shops/:id", shopHandler.GetShop)        // Public shop profile
+    router.GET("/api/shops/:id/images", shopHandler.GetShopImages) // Public shop images
+    router.GET("/api/shops/:id/jobs", shopHandler.GetShopJobs)     // Public shop jobs
 
     // Protected routes (authentication required)
     protected := router.Group("/api")
@@ -117,13 +125,32 @@ func main() {
         protected.POST("/ratings", ratingHandler.CreateRating)
         protected.GET("/ratings/user/:id", ratingHandler.GetUserRatings)
 
-        // Workers browsing (employers only)
-        protected.GET("/workers", middleware.EmployerOnly(), workersHandler.ListWorkers)
+        // Workers browsing
+        protected.GET("/workers", workersHandler.ListWorkers)
+        
+        // Help Requests (Worker Only)
+        hr := protected.Group("/workers/help-requests", middleware.WorkerOnly())
+        {
+            hr.POST("", workersHandler.SendHelpRequest)
+            hr.GET("/received", workersHandler.GetReceivedHelpRequests)
+            hr.GET("/sent", workersHandler.GetSentHelpRequests)
+            hr.PUT("/:id/respond", workersHandler.RespondHelpRequest)
+            hr.DELETE("/:id", workersHandler.DeleteHelpRequest)
+        }
 
         // Favorite workers (employers only)
         protected.GET("/favorites/workers", middleware.EmployerOnly(), favoritesHandler.ListFavoriteWorkers)
         protected.POST("/favorites/workers/:workerId", middleware.EmployerOnly(), favoritesHandler.AddFavoriteWorker)
         protected.DELETE("/favorites/workers/:workerId", middleware.EmployerOnly(), favoritesHandler.RemoveFavoriteWorker)
+
+        // Shop routes (shopkeeper only for mutations)
+        protected.POST("/shops", middleware.ShopkeeperOnly(), shopHandler.CreateShop)
+        protected.GET("/shops/my", middleware.ShopkeeperOnly(), shopHandler.GetMyShops)
+        protected.PUT("/shops/:id", middleware.ShopkeeperOnly(), shopHandler.UpdateShop)
+        protected.POST("/shops/:id/images", middleware.ShopkeeperOnly(), shopHandler.AddShopImage)
+
+        // Upload route
+        protected.POST("/upload", uploadHandler.UploadFile)
     }
 
     // Get port from environment or default to 8080
